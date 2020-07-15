@@ -1,10 +1,8 @@
-package cn.hotdb.parser.token;
+package parser.token;
 
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午7:27:50
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class IntervalUnitParser {
     public static int get(byte[] sql, int offset, int size) {
@@ -47,10 +45,9 @@ public class IntervalUnitParser {
                     if (size < 8 || size > 15) {
                         return 0;
                     }
-                    if (size == 8 && (sql[4 + offset] == 'H' || sql[4 + offset] == 'h')
-                            && (sql[5 + offset] == 'O' || sql[5 + offset] == 'o')
-                            && (sql[6 + offset] == 'U' || sql[6 + offset] == 'u')
-                            && (sql[7 + offset] == 'R' || sql[7 + offset] == 'r')) {
+                    if (size == 8 && (sql[4 + offset] == 'H' || sql[4 + offset] == 'h') && (sql[5 + offset] == 'O'
+                        || sql[5 + offset] == 'o') && (sql[6 + offset] == 'U' || sql[6 + offset] == 'u') && (
+                        sql[7 + offset] == 'R' || sql[7 + offset] == 'r')) {
                         return IntervalUnit.DAY_HOUR;
                     }
                     if (sql[4 + offset] == 'M' || sql[4 + offset] == 'm') {
@@ -58,31 +55,26 @@ public class IntervalUnitParser {
                             return 0;
                         }
                         if (sql[5 + offset] == 'I' || sql[5 + offset] == 'i') {
-                            if (size == 15 && (sql[6 + offset] == 'C' || sql[6 + offset] == 'c')
-                                    && (sql[7 + offset] == 'R' || sql[7 + offset] == 'r')
-                                    && (sql[8 + offset] == 'O' || sql[8 + offset] == 'o')
-                                    && (sql[9 + offset] == 'S' || sql[9 + offset] == 's')
-                                    && (sql[10 + offset] == 'E' || sql[10 + offset] == 'e')
-                                    && (sql[11 + offset] == 'C' || sql[11 + offset] == 'c')
-                                    && (sql[12 + offset] == 'O' || sql[12 + offset] == 'o')
-                                    && (sql[13 + offset] == 'N' || sql[13 + offset] == 'n')
-                                    && (sql[14 + offset] == 'D' || sql[14 + offset] == 'd')) {
+                            if (size == 15 && (sql[6 + offset] == 'C' || sql[6 + offset] == 'c') && (
+                                sql[7 + offset] == 'R' || sql[7 + offset] == 'r') && (sql[8 + offset] == 'O'
+                                || sql[8 + offset] == 'o') && (sql[9 + offset] == 'S' || sql[9 + offset] == 's') && (
+                                sql[10 + offset] == 'E' || sql[10 + offset] == 'e') && (sql[11 + offset] == 'C'
+                                || sql[11 + offset] == 'c') && (sql[12 + offset] == 'O' || sql[12 + offset] == 'o') && (
+                                sql[13 + offset] == 'N' || sql[13 + offset] == 'n') && (sql[14 + offset] == 'D'
+                                || sql[14 + offset] == 'd')) {
                                 return IntervalUnit.DAY_MICROSECOND;
                             }
-                            if (size == 10 && (sql[6 + offset] == 'N' || sql[6 + offset] == 'n')
-                                    && (sql[7 + offset] == 'U' || sql[7 + offset] == 'u')
-                                    && (sql[8 + offset] == 'T' || sql[8 + offset] == 't')
-                                    && (sql[9 + offset] == 'E' || sql[9 + offset] == 'e')) {
+                            if (size == 10 && (sql[6 + offset] == 'N' || sql[6 + offset] == 'n') && (
+                                sql[7 + offset] == 'U' || sql[7 + offset] == 'u') && (sql[8 + offset] == 'T'
+                                || sql[8 + offset] == 't') && (sql[9 + offset] == 'E' || sql[9 + offset] == 'e')) {
                                 return IntervalUnit.DAY_MINUTE;
                             }
                         }
                     }
-                    if (size == 10 && (sql[4 + offset] == 'S' || sql[4 + offset] == 's')
-                            && (sql[5 + offset] == 'E' || sql[5 + offset] == 'e')
-                            && (sql[6 + offset] == 'C' || sql[6 + offset] == 'c')
-                            && (sql[7 + offset] == 'O' || sql[7 + offset] == 'o')
-                            && (sql[8 + offset] == 'N' || sql[8 + offset] == 'n')
-                            && (sql[9 + offset] == 'D' || sql[9 + offset] == 'd')) {
+                    if (size == 10 && (sql[4 + offset] == 'S' || sql[4 + offset] == 's') && (sql[5 + offset] == 'E'
+                        || sql[5 + offset] == 'e') && (sql[6 + offset] == 'C' || sql[6 + offset] == 'c') && (
+                        sql[7 + offset] == 'O' || sql[7 + offset] == 'o') && (sql[8 + offset] == 'N'
+                        || sql[8 + offset] == 'n') && (sql[9 + offset] == 'D' || sql[9 + offset] == 'd')) {
                         return IntervalUnit.DAY_SECOND;
                     }
                 }
@@ -107,31 +99,27 @@ public class IntervalUnitParser {
                         }
                         if (sql[5 + offset] == 'M' || sql[5 + offset] == 'm') {
                             if (sql[6 + offset] == 'I' || sql[6 + offset] == 'i') {
-                                if (size == 16 && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c')
-                                        && (sql[8 + offset] == 'R' || sql[8 + offset] == 'r')
-                                        && (sql[9 + offset] == 'O' || sql[9 + offset] == 'o')
-                                        && (sql[10 + offset] == 'S' || sql[10 + offset] == 's')
-                                        && (sql[11 + offset] == 'E' || sql[11 + offset] == 'e')
-                                        && (sql[12 + offset] == 'C' || sql[12 + offset] == 'c')
-                                        && (sql[13 + offset] == 'O' || sql[13 + offset] == 'o')
-                                        && (sql[14 + offset] == 'N' || sql[14 + offset] == 'n')
-                                        && (sql[15 + offset] == 'D' || sql[15 + offset] == 'd')) {
+                                if (size == 16 && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c') && (
+                                    sql[8 + offset] == 'R' || sql[8 + offset] == 'r') && (sql[9 + offset] == 'O'
+                                    || sql[9 + offset] == 'o') && (sql[10 + offset] == 'S' || sql[10 + offset] == 's')
+                                    && (sql[11 + offset] == 'E' || sql[11 + offset] == 'e') && (sql[12 + offset] == 'C'
+                                    || sql[12 + offset] == 'c') && (sql[13 + offset] == 'O' || sql[13 + offset] == 'o')
+                                    && (sql[14 + offset] == 'N' || sql[14 + offset] == 'n') && (sql[15 + offset] == 'D'
+                                    || sql[15 + offset] == 'd')) {
                                     return IntervalUnit.HOUR_MICROSECOND;
                                 }
-                                if (size == 11 && (sql[7 + offset] == 'N' || sql[7 + offset] == 'n')
-                                        && (sql[8 + offset] == 'U' || sql[8 + offset] == 'u')
-                                        && (sql[9 + offset] == 'T' || sql[9 + offset] == 't')
-                                        && (sql[10 + offset] == 'E' || sql[10 + offset] == 'e')) {
+                                if (size == 11 && (sql[7 + offset] == 'N' || sql[7 + offset] == 'n') && (
+                                    sql[8 + offset] == 'U' || sql[8 + offset] == 'u') && (sql[9 + offset] == 'T'
+                                    || sql[9 + offset] == 't') && (sql[10 + offset] == 'E'
+                                    || sql[10 + offset] == 'e')) {
                                     return IntervalUnit.HOUR_MINUTE;
                                 }
                             }
                         }
-                        if (size == 11 && (sql[5 + offset] == 'S' || sql[5 + offset] == 's')
-                                && (sql[6 + offset] == 'E' || sql[6 + offset] == 'e')
-                                && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c')
-                                && (sql[8 + offset] == 'O' || sql[8 + offset] == 'o')
-                                && (sql[9 + offset] == 'N' || sql[9 + offset] == 'n')
-                                && (sql[10 + offset] == 'D' || sql[10 + offset] == 'd')) {
+                        if (size == 11 && (sql[5 + offset] == 'S' || sql[5 + offset] == 's') && (sql[6 + offset] == 'E'
+                            || sql[6 + offset] == 'e') && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c') && (
+                            sql[8 + offset] == 'O' || sql[8 + offset] == 'o') && (sql[9 + offset] == 'N'
+                            || sql[9 + offset] == 'n') && (sql[10 + offset] == 'D' || sql[10 + offset] == 'd')) {
                             return IntervalUnit.HOUR_SECOND;
                         }
                     }
@@ -149,15 +137,12 @@ public class IntervalUnitParser {
             if (size < 6 || size > 18) {
                 return 0;
             }
-            if (size == 11 && (sql[2 + offset] == 'C' || sql[2 + offset] == 'c')
-                    && (sql[3 + offset] == 'R' || sql[3 + offset] == 'r')
-                    && (sql[4 + offset] == 'O' || sql[4 + offset] == 'o')
-                    && (sql[5 + offset] == 'S' || sql[5 + offset] == 's')
-                    && (sql[6 + offset] == 'E' || sql[6 + offset] == 'e')
-                    && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c')
-                    && (sql[8 + offset] == 'O' || sql[8 + offset] == 'o')
-                    && (sql[9 + offset] == 'N' || sql[9 + offset] == 'n')
-                    && (sql[10 + offset] == 'D' || sql[10 + offset] == 'd')) {
+            if (size == 11 && (sql[2 + offset] == 'C' || sql[2 + offset] == 'c') && (sql[3 + offset] == 'R'
+                || sql[3 + offset] == 'r') && (sql[4 + offset] == 'O' || sql[4 + offset] == 'o') && (
+                sql[5 + offset] == 'S' || sql[5 + offset] == 's') && (sql[6 + offset] == 'E' || sql[6 + offset] == 'e')
+                && (sql[7 + offset] == 'C' || sql[7 + offset] == 'c') && (sql[8 + offset] == 'O'
+                || sql[8 + offset] == 'o') && (sql[9 + offset] == 'N' || sql[9 + offset] == 'n') && (
+                sql[10 + offset] == 'D' || sql[10 + offset] == 'd')) {
                 return IntervalUnit.MICROSECOND;
             }
             if (sql[2 + offset] == 'N' || sql[2 + offset] == 'n') {
@@ -171,25 +156,21 @@ public class IntervalUnitParser {
                                 if (size < 13 || size > 18) {
                                     return 0;
                                 }
-                                if (size == 18 && (sql[7 + offset] == 'M' || sql[7 + offset] == 'm')
-                                        && (sql[8 + offset] == 'I' || sql[8 + offset] == 'i')
-                                        && (sql[9 + offset] == 'C' || sql[9 + offset] == 'c')
-                                        && (sql[10 + offset] == 'R' || sql[10 + offset] == 'r')
-                                        && (sql[11 + offset] == 'O' || sql[11 + offset] == 'o')
-                                        && (sql[12 + offset] == 'S' || sql[12 + offset] == 's')
-                                        && (sql[13 + offset] == 'E' || sql[13 + offset] == 'e')
-                                        && (sql[14 + offset] == 'C' || sql[14 + offset] == 'c')
-                                        && (sql[15 + offset] == 'O' || sql[15 + offset] == 'o')
-                                        && (sql[16 + offset] == 'N' || sql[16 + offset] == 'n')
-                                        && (sql[17 + offset] == 'D' || sql[17 + offset] == 'd')) {
+                                if (size == 18 && (sql[7 + offset] == 'M' || sql[7 + offset] == 'm') && (
+                                    sql[8 + offset] == 'I' || sql[8 + offset] == 'i') && (sql[9 + offset] == 'C'
+                                    || sql[9 + offset] == 'c') && (sql[10 + offset] == 'R' || sql[10 + offset] == 'r')
+                                    && (sql[11 + offset] == 'O' || sql[11 + offset] == 'o') && (sql[12 + offset] == 'S'
+                                    || sql[12 + offset] == 's') && (sql[13 + offset] == 'E' || sql[13 + offset] == 'e')
+                                    && (sql[14 + offset] == 'C' || sql[14 + offset] == 'c') && (sql[15 + offset] == 'O'
+                                    || sql[15 + offset] == 'o') && (sql[16 + offset] == 'N' || sql[16 + offset] == 'n')
+                                    && (sql[17 + offset] == 'D' || sql[17 + offset] == 'd')) {
                                     return IntervalUnit.MINUTE_MICROSECOND;
                                 }
-                                if (size == 13 && (sql[7 + offset] == 'S' || sql[7 + offset] == 's')
-                                        && (sql[8 + offset] == 'E' || sql[8 + offset] == 'e')
-                                        && (sql[9 + offset] == 'C' || sql[9 + offset] == 'c')
-                                        && (sql[10 + offset] == 'O' || sql[10 + offset] == 'o')
-                                        && (sql[11 + offset] == 'N' || sql[11 + offset] == 'n')
-                                        && (sql[12 + offset] == 'D' || sql[12 + offset] == 'd')) {
+                                if (size == 13 && (sql[7 + offset] == 'S' || sql[7 + offset] == 's') && (
+                                    sql[8 + offset] == 'E' || sql[8 + offset] == 'e') && (sql[9 + offset] == 'C'
+                                    || sql[9 + offset] == 'c') && (sql[10 + offset] == 'O' || sql[10 + offset] == 'o')
+                                    && (sql[11 + offset] == 'N' || sql[11 + offset] == 'n') && (sql[12 + offset] == 'D'
+                                    || sql[12 + offset] == 'd')) {
                                     return IntervalUnit.MINUTE_SECOND;
                                 }
                             }
@@ -198,10 +179,9 @@ public class IntervalUnitParser {
                 }
             }
         }
-        if (size == 5 && (sql[1 + offset] == 'O' || sql[1 + offset] == 'o')
-                && (sql[2 + offset] == 'N' || sql[2 + offset] == 'n')
-                && (sql[3 + offset] == 'T' || sql[3 + offset] == 't')
-                && (sql[4 + offset] == 'H' || sql[4 + offset] == 'h')) {
+        if (size == 5 && (sql[1 + offset] == 'O' || sql[1 + offset] == 'o') && (sql[2 + offset] == 'N'
+            || sql[2 + offset] == 'n') && (sql[3 + offset] == 'T' || sql[3 + offset] == 't') && (sql[4 + offset] == 'H'
+            || sql[4 + offset] == 'h')) {
             return IntervalUnit.MONTH;
         }
         return 0;
@@ -211,12 +191,10 @@ public class IntervalUnitParser {
         if (size != 7) {
             return 0;
         }
-        if (size == 7 && (sql[1 + offset] == 'U' || sql[1 + offset] == 'u')
-                && (sql[2 + offset] == 'A' || sql[2 + offset] == 'a')
-                && (sql[3 + offset] == 'R' || sql[3 + offset] == 'r')
-                && (sql[4 + offset] == 'T' || sql[4 + offset] == 't')
-                && (sql[5 + offset] == 'E' || sql[5 + offset] == 'e')
-                && (sql[6 + offset] == 'R' || sql[6 + offset] == 'r')) {
+        if (size == 7 && (sql[1 + offset] == 'U' || sql[1 + offset] == 'u') && (sql[2 + offset] == 'A'
+            || sql[2 + offset] == 'a') && (sql[3 + offset] == 'R' || sql[3 + offset] == 'r') && (sql[4 + offset] == 'T'
+            || sql[4 + offset] == 't') && (sql[5 + offset] == 'E' || sql[5 + offset] == 'e') && (sql[6 + offset] == 'R'
+            || sql[6 + offset] == 'r')) {
             return IntervalUnit.QUARTER;
         }
         return 0;
@@ -234,18 +212,15 @@ public class IntervalUnitParser {
                             if (size == 6) {
                                 return IntervalUnit.SECOND;
                             }
-                            if (size == 18 && (sql[6 + offset] == '_' || sql[6 + offset] == '_')
-                                    && (sql[7 + offset] == 'M' || sql[7 + offset] == 'm')
-                                    && (sql[8 + offset] == 'I' || sql[8 + offset] == 'i')
-                                    && (sql[9 + offset] == 'C' || sql[9 + offset] == 'c')
-                                    && (sql[10 + offset] == 'R' || sql[10 + offset] == 'r')
-                                    && (sql[11 + offset] == 'O' || sql[11 + offset] == 'o')
-                                    && (sql[12 + offset] == 'S' || sql[12 + offset] == 's')
-                                    && (sql[13 + offset] == 'E' || sql[13 + offset] == 'e')
-                                    && (sql[14 + offset] == 'C' || sql[14 + offset] == 'c')
-                                    && (sql[15 + offset] == 'O' || sql[15 + offset] == 'o')
-                                    && (sql[16 + offset] == 'N' || sql[16 + offset] == 'n')
-                                    && (sql[17 + offset] == 'D' || sql[17 + offset] == 'd')) {
+                            if (size == 18 && (sql[6 + offset] == '_' || sql[6 + offset] == '_') && (
+                                sql[7 + offset] == 'M' || sql[7 + offset] == 'm') && (sql[8 + offset] == 'I'
+                                || sql[8 + offset] == 'i') && (sql[9 + offset] == 'C' || sql[9 + offset] == 'c') && (
+                                sql[10 + offset] == 'R' || sql[10 + offset] == 'r') && (sql[11 + offset] == 'O'
+                                || sql[11 + offset] == 'o') && (sql[12 + offset] == 'S' || sql[12 + offset] == 's') && (
+                                sql[13 + offset] == 'E' || sql[13 + offset] == 'e') && (sql[14 + offset] == 'C'
+                                || sql[14 + offset] == 'c') && (sql[15 + offset] == 'O' || sql[15 + offset] == 'o') && (
+                                sql[16 + offset] == 'N' || sql[16 + offset] == 'n') && (sql[17 + offset] == 'D'
+                                || sql[17 + offset] == 'd')) {
                                 return IntervalUnit.SECOND_MICROSECOND;
                             }
                         }
@@ -260,9 +235,8 @@ public class IntervalUnitParser {
         if (size != 4) {
             return 0;
         }
-        if (size == 4 && (sql[1 + offset] == 'E' || sql[1 + offset] == 'e')
-                && (sql[2 + offset] == 'E' || sql[2 + offset] == 'e')
-                && (sql[3 + offset] == 'K' || sql[3 + offset] == 'k')) {
+        if (size == 4 && (sql[1 + offset] == 'E' || sql[1 + offset] == 'e') && (sql[2 + offset] == 'E'
+            || sql[2 + offset] == 'e') && (sql[3 + offset] == 'K' || sql[3 + offset] == 'k')) {
             return IntervalUnit.WEEK;
         }
         return 0;
@@ -278,12 +252,10 @@ public class IntervalUnitParser {
                     if (size == 4) {
                         return IntervalUnit.YEAR;
                     }
-                    if (size == 10 && (sql[4 + offset] == '_' || sql[4 + offset] == '_')
-                            && (sql[5 + offset] == 'M' || sql[5 + offset] == 'm')
-                            && (sql[6 + offset] == 'O' || sql[6 + offset] == 'o')
-                            && (sql[7 + offset] == 'N' || sql[7 + offset] == 'n')
-                            && (sql[8 + offset] == 'T' || sql[8 + offset] == 't')
-                            && (sql[9 + offset] == 'H' || sql[9 + offset] == 'h')) {
+                    if (size == 10 && (sql[4 + offset] == '_' || sql[4 + offset] == '_') && (sql[5 + offset] == 'M'
+                        || sql[5 + offset] == 'm') && (sql[6 + offset] == 'O' || sql[6 + offset] == 'o') && (
+                        sql[7 + offset] == 'N' || sql[7 + offset] == 'n') && (sql[8 + offset] == 'T'
+                        || sql[8 + offset] == 't') && (sql[9 + offset] == 'H' || sql[9 + offset] == 'h')) {
                         return IntervalUnit.YEAR_MONTH;
                     }
                 }

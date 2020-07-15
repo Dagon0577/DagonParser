@@ -1,8 +1,10 @@
 package parser.ast.expression.primary.literal;
 
+import parser.ast.expression.PrimaryExpression;
+
 /**
- * @author huangganyan
- * @date 2020/7/14
+ * @author Dagon0577
+ * @date 2020/5/15
  */
-public class Literal {
+public abstract class Literal extends PrimaryExpression {
 }

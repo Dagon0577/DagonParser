@@ -3,15 +3,14 @@ package parser.util;
 import java.io.Serializable;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/7/14
  */
 public abstract class Tuple implements Serializable {
 
     private static final long serialVersionUID = -367405510977455914L;
 
-    @Override
-    public int hashCode() {
+    @Override public int hashCode() {
         int result = 17;
         result = 37 * result + this.hashCode();
         return result;
@@ -19,15 +18,15 @@ public abstract class Tuple implements Serializable {
 
     abstract protected boolean elementEquals(Tuple tuple);
 
-    @Override
-    public boolean equals(Object object) {
+    @Override public boolean equals(Object object) {
         boolean rv = false;
-        if (!(object instanceof Tuple))
+        if (!(object instanceof Tuple)) {
             return false;
-        if (object == this)
+        }
+        if (object == this) {
             return true;
-
-        Tuple tuple = (Tuple) object;
+        }
+        Tuple tuple = (Tuple)object;
         rv = elementEquals(tuple);
 
         return rv;

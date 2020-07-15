@@ -1,13 +1,11 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
 
-import cn.hotdb.parser.ast.expression.PrimaryExpression;
-import cn.hotdb.parser.visitor.Visitor;
+import parser.ast.expression.PrimaryExpression;
+import parser.visitor.Visitor;
 
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午5:50:12
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class DefaultValue extends PrimaryExpression {
 

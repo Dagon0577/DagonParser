@@ -1,16 +1,14 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.expression.Expression;
+import parser.token.Functions;
+import parser.visitor.Visitor;
 
 import java.util.List;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.token.Functions;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月19日 下午1:50:01
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class Char extends FunctionExpression {
     private final String charset;

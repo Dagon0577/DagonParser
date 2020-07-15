@@ -1,15 +1,13 @@
-package cn.hotdb.parser.ast.expression.primary.literal;
+package parser.ast.expression.primary.literal;
+
+import parser.util.BytesUtil;
+import parser.visitor.Visitor;
 
 import java.util.Map;
 
-import cn.hotdb.parser.util.BytesUtil;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午5:46:27
- * 
+ * @author Dagon0577
+ * @date 2020/7/14
  */
 public class LiteralString extends Literal {
     private final byte[] introducer;
@@ -53,8 +51,7 @@ public class LiteralString extends Literal {
     }
 
     @Override
-    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters,
-            byte[] sql) {
+    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters, byte[] sql) {
         if (string == 0)
             return null;
         return new String(BytesUtil.getValue(sql, string));

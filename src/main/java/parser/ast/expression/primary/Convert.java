@@ -1,15 +1,13 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.ast.fragment.ddl.DataType;
-import cn.hotdb.parser.token.Functions;
-import cn.hotdb.parser.visitor.Visitor;
+import parser.ast.expression.Expression;
+import parser.ast.fragment.ddl.DataType;
+import parser.token.Functions;
+import parser.visitor.Visitor;
 
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午6:57:35
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class Convert extends FunctionExpression {
     private final long transcodeName;
@@ -30,8 +28,8 @@ public class Convert extends FunctionExpression {
         this.typeInfo2 = null;
     }
 
-    public Convert(byte[] functionName, Expression expr, DataType type, long typeName,
-            Expression typeInfo1, Expression typeInfo2) {
+    public Convert(byte[] functionName, Expression expr, DataType type, long typeName, Expression typeInfo1,
+        Expression typeInfo2) {
         super(Functions.CONVERT, functionName, wrapList(expr));
         this.type = type;
         this.typeName = typeName;

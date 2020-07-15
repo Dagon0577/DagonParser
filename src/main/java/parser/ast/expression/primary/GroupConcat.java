@@ -1,18 +1,16 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.AST;
+import parser.ast.expression.Expression;
+import parser.ast.fragment.OrderBy;
+import parser.token.Functions;
+import parser.visitor.Visitor;
 
 import java.util.List;
 
-import cn.hotdb.parser.ast.AST;
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.ast.fragment.OrderBy;
-import cn.hotdb.parser.token.Functions;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午7:13:56
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class GroupConcat extends FunctionExpression {
     private final boolean distinct;
@@ -20,8 +18,8 @@ public class GroupConcat extends FunctionExpression {
     private final String separator;
     private final boolean isNullSeqarator;
 
-    public GroupConcat(byte[] functionName, List<Expression> arguments, boolean distinct,
-            OrderBy orderBy, String separator) {
+    public GroupConcat(byte[] functionName, List<Expression> arguments, boolean distinct, OrderBy orderBy,
+        String separator) {
         super(Functions.GROUP_CONCAT, functionName, arguments);
         this.distinct = distinct;
         this.orderBy = orderBy;
@@ -55,7 +53,7 @@ public class GroupConcat extends FunctionExpression {
         boolean result = false;
         if (orderBy != null) {
             if (orderBy.equals(from)) {
-                orderBy = (OrderBy) to;
+                orderBy = (OrderBy)to;
             } else {
                 result |= orderBy.replace(from, to);
             }

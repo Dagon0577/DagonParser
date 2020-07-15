@@ -1,12 +1,12 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.visitor.Visitor;
+import parser.ast.expression.Expression;
+import parser.visitor.Visitor;
 
 import java.util.List;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/4/17 14:37
  */
 public class FromForFunction extends FunctionExpression {

@@ -1,14 +1,12 @@
-package cn.hotdb.parser.ast.expression.primary.literal;
+package parser.ast.expression.primary.literal;
+
+import parser.visitor.Visitor;
 
 import java.util.Map;
 
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午5:45:48
- * 
+ * @author Dagon0577
+ * @date 2020/7/14
  */
 public class LiteralBoolean extends Literal {
     public static final Integer TRUE = new Integer(1);
@@ -29,8 +27,7 @@ public class LiteralBoolean extends Literal {
     }
 
     @Override
-    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters,
-            byte[] sql) {
+    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters, byte[] sql) {
         return value ? TRUE : FALSE;
     }
 }

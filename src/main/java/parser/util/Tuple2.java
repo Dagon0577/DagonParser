@@ -1,7 +1,7 @@
 package parser.util;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/7/14
  */
 public class Tuple2<E1, E2> extends Tuple {
@@ -21,32 +21,28 @@ public class Tuple2<E1, E2> extends Tuple {
         return e2;
     }
 
-    @Override
-    protected boolean elementEquals(Tuple tuple) {
+    @Override protected boolean elementEquals(Tuple tuple) {
         if (!(tuple instanceof Tuple2)) {
             return false;
         }
-        Tuple2<?, ?> tuple2 = (Tuple2<?, ?>) tuple;
+        Tuple2<?, ?> tuple2 = (Tuple2<?, ?>)tuple;
         if (same(this.e1, tuple2.e1) && same(this.e2, tuple2.e2)) {
             return true;
         }
         return false;
     }
 
-    @Override
-    public int hashCode() {
+    @Override public int hashCode() {
         int result = 1;
         result = result * 31 + (e1 == null ? 0 : e1.hashCode());
         result = result * 31 + (e2 == null ? 0 : e2.hashCode());
         return result;
     }
 
-    @Override
-    public String toString() {
+    @Override public String toString() {
         return new StringBuilder().append("{").append(e1 == null ? "[NULL]" : e1).append(":")
             .append(e2 == null ? "[NULL]" : e2).append("}").toString();
     }
-
 
     public void setE1(E1 e1) {
         this.e1 = e1;

@@ -1,22 +1,19 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.expression.Expression;
+import parser.visitor.Visitor;
 
 import java.util.List;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午7:09:33
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class GroupFunction extends FunctionExpression {
 
     private final boolean distinct;
 
-    public GroupFunction(int type, byte[] functionName, List<Expression> arguments,
-            boolean distinct) {
+    public GroupFunction(int type, byte[] functionName, List<Expression> arguments, boolean distinct) {
         super(type, functionName, arguments);
         this.distinct = distinct;
     }

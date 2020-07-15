@@ -1,14 +1,12 @@
-package cn.hotdb.parser.ast.expression.primary.literal;
+package parser.ast.expression.primary.literal;
+
+import parser.visitor.Visitor;
 
 import java.util.Map;
 
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午5:46:11
- * 
+ * @author Dagon0577
+ * @date 2020/7/14
  */
 public class LiteralNull extends Literal {
 
@@ -18,8 +16,7 @@ public class LiteralNull extends Literal {
     }
 
     @Override
-    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters,
-            byte[] sql) {
+    public Object evaluationInternal(Map<? extends Object, ? extends Object> parameters, byte[] sql) {
         return null;
     }
 

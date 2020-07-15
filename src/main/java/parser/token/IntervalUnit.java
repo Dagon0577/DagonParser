@@ -1,10 +1,8 @@
-package cn.hotdb.parser.token;
+package parser.token;
 
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午7:25:22
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public abstract class IntervalUnit {
     public static final int DAY = 1;

@@ -1,16 +1,14 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.expression.Expression;
+import parser.token.Functions;
+import parser.visitor.Visitor;
 
 import java.util.List;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.token.Functions;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2019年2月22日 下午4:28:51
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class Trim extends FunctionExpression {
     public static final int BOTH = 1;

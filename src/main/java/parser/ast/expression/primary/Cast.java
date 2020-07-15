@@ -1,15 +1,13 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
 
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.ast.fragment.ddl.DataType;
-import cn.hotdb.parser.token.Functions;
-import cn.hotdb.parser.visitor.Visitor;
+import parser.ast.expression.Expression;
+import parser.ast.fragment.ddl.DataType;
+import parser.token.Functions;
+import parser.visitor.Visitor;
 
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午6:57:22
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class Cast extends FunctionExpression {
     private final long typeName;
@@ -17,8 +15,7 @@ public class Cast extends FunctionExpression {
     private Expression typeInfo2;
     private final DataType type;
 
-    public Cast(byte[] functionName, Expression expr, long typeName, Expression typeInfo1,
-            Expression typeInfo2) {
+    public Cast(byte[] functionName, Expression expr, long typeName, Expression typeInfo1, Expression typeInfo2) {
         super(Functions.CAST, functionName, wrapList(expr));
         if (0 == typeName) {
             throw new IllegalArgumentException("typeName is null");

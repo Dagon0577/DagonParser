@@ -1,8 +1,25 @@
-package PACKAGE_NAME;
+import junit.framework.TestCase;
+import parser.ast.AST;
+import parser.visitor.OutputVisitor;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/7/15
  */
-public class AbstractSyntaxTest {
+public class AbstractSyntaxTest extends TestCase {
+
+    private static final boolean debug = false;
+
+    protected String output2MySQL(AST node, byte[] sql) {
+        OutputVisitor ov = new OutputVisitor(sql);
+        node.accept(ov);
+        String sb = new String(ov.getData());
+        if (debug) {
+            System.out.println("DagonParser: " + getClass().getName() + "'s testcase: ");
+            System.out.println("    " + sql);
+            System.out.println("==>" + sb);
+            System.out.println("--------------------------------------------------");
+        }
+        return sb;
+    }
 }

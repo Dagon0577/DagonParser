@@ -1,20 +1,18 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.AST;
+import parser.ast.expression.Expression;
+import parser.ast.expression.PrimaryExpression;
+import parser.ast.expression.primary.literal.Literal;
+import parser.visitor.Visitor;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import cn.hotdb.parser.ast.AST;
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.ast.expression.PrimaryExpression;
-import cn.hotdb.parser.ast.expression.primary.literal.Literal;
-import cn.hotdb.parser.visitor.Visitor;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午4:42:39
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class FunctionExpression extends PrimaryExpression {
     protected static final List<Expression> wrapList(Expression expr) {
@@ -60,7 +58,7 @@ public class FunctionExpression extends PrimaryExpression {
             Expression exp = iter.next();
             if (exp != null) {
                 if (exp.equals(from)) {
-                    arguments.set(i, (Expression) to);
+                    arguments.set(i, (Expression)to);
                     result = true;
                 } else {
                     result |= exp.replace(from, to);

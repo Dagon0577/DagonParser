@@ -1,27 +1,24 @@
-package cn.hotdb.parser.ast.expression.primary;
+package parser.ast.expression.primary;
+
+import parser.ast.AST;
+import parser.ast.expression.Expression;
+import parser.ast.expression.PrimaryExpression;
+import parser.visitor.Visitor;
+import parser.util.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import cn.hotdb.parser.ast.AST;
-import cn.hotdb.parser.ast.expression.Expression;
-import cn.hotdb.parser.ast.expression.PrimaryExpression;
-import cn.hotdb.parser.visitor.Visitor;
-import cn.hotpu.hotdb.parser.util.Pair;
-
 /**
- * 
- * @author liuhuanting
- * @date 2018年11月16日 下午5:33:08
- * 
+ * @author Dagon0577
+ * @date 2020/7/15
  */
 public class CaseWhenExpression extends PrimaryExpression {
     private Expression comparee;
     private final List<Pair<Expression, Expression>> whenList;
     private Expression elseResult;
 
-    public CaseWhenExpression(Expression comparee, List<Pair<Expression, Expression>> whenList,
-            Expression elseResult) {
+    public CaseWhenExpression(Expression comparee, List<Pair<Expression, Expression>> whenList, Expression elseResult) {
         this.comparee = comparee;
         if (whenList instanceof ArrayList) {
             this.whenList = whenList;
@@ -53,7 +50,7 @@ public class CaseWhenExpression extends PrimaryExpression {
         boolean result = false;
         if (comparee != null) {
             if (comparee.equals(from)) {
-                comparee = (Expression) to;
+                comparee = (Expression)to;
                 result = true;
             } else {
                 result |= comparee.replace(from, to);
@@ -62,7 +59,7 @@ public class CaseWhenExpression extends PrimaryExpression {
         for (Pair<Expression, Expression> p : whenList) {
             if (p.getKey() != null) {
                 if (p.getKey().equals(from)) {
-                    p.setKey((Expression) to);
+                    p.setKey((Expression)to);
                     result = true;
                 } else {
                     result |= p.getKey().replace(from, to);
@@ -70,7 +67,7 @@ public class CaseWhenExpression extends PrimaryExpression {
             }
             if (p.getValue() != null) {
                 if (p.getValue().equals(from)) {
-                    p.setValue((Expression) to);
+                    p.setValue((Expression)to);
                     result = true;
                 } else {
                     result |= p.getValue().replace(from, to);
@@ -79,7 +76,7 @@ public class CaseWhenExpression extends PrimaryExpression {
         }
         if (elseResult != null) {
             if (elseResult.equals(from)) {
-                elseResult = (Expression) to;
+                elseResult = (Expression)to;
                 result = true;
             } else {
                 result |= elseResult.replace(from, to);
