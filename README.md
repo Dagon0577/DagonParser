@@ -10,8 +10,12 @@ MySQL high-performance parser, use byte stream parsing.
 
 Lexical analysis and grammatical analysis refer to MySQL 8.0
 
-# Parser
+# Support statement
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
+- [Create](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
+- [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
+- [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)
+- [Insert](https://dev.mysql.com/doc/refman/8.0/en/insert.html)
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
