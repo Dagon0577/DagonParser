@@ -76,6 +76,23 @@ public abstract class AbstractParser {
         throw new SQLSyntaxErrorException("expect " + sb.toString());
     }
 
+    protected int matchIdentifier(String... expectTextUppercase) throws SQLSyntaxErrorException {
+        if (expectTextUppercase == null || expectTextUppercase.length <= 0) {
+            throw new IllegalArgumentException("at least one expect token");
+        }
+        if (lexer.token() != Token.IDENTIFIER) {
+            throw new SQLSyntaxErrorException("expect an identifier");
+        }
+        String id = lexer.stringValueUppercase();
+        for (int i = 0; i < expectTextUppercase.length; ++i) {
+            if (id == null ? expectTextUppercase[i] == null : id.equals(expectTextUppercase[i])) {
+                lexer.nextToken();
+                return i;
+            }
+        }
+        throw new SQLSyntaxErrorException("expect " + expectTextUppercase);
+    }
+
     protected int matchKeywords(int... expectKeywords) throws SQLSyntaxErrorException {
         if (lexer.token() != Token.IDENTIFIER) {
             throw new SQLSyntaxErrorException("expect an identifier");

@@ -5,21 +5,22 @@ import parser.ast.expression.Expression;
 import parser.ast.expression.QueryExpression;
 import parser.ast.expression.primary.Identifier;
 import parser.ast.expression.primary.ParamMarker;
+import parser.ast.expression.primary.RowExpression;
 import parser.ast.expression.primary.WithClause;
 import parser.ast.expression.primary.WithClause.CTE;
 import parser.ast.fragment.GroupBy;
 import parser.ast.fragment.Limit;
 import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.tableref.*;
-import parser.ast.stmt.dml.DMLQueryStatement;
-import parser.ast.stmt.dml.DMLSelectStatement;
-import parser.ast.stmt.dml.DMLSelectUnionStatement;
+import parser.ast.stmt.dml.*;
 import parser.lexer.Lexer;
 import parser.token.Keywords;
 import parser.token.Token;
+import parser.util.Pair;
 
 import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -34,6 +35,297 @@ public class MySQLDMLParser extends AbstractParser {
     public MySQLDMLParser(Lexer lexer, ExprParser exprParser) {
         super(lexer);
         this.exprParser = exprParser;
+    }
+
+    public DMLSelectStatement select() throws SQLSyntaxErrorException {
+        MySQLDMLSelectParser parser = new MySQLDMLSelectParser(lexer, exprParser);
+        return parser.select();
+    }
+
+    public DMLUpdateStatement update() throws SQLSyntaxErrorException {
+        match(Token.KW_UPDATE);
+        boolean lowPriority = false;
+        boolean ignore = false;
+        if (lexer.token() == Token.KW_LOW_PRIORITY) {
+            lexer.nextToken();
+            lowPriority = true;
+        }
+        if (lexer.token() == Token.KW_IGNORE) {
+            lexer.nextToken();
+            ignore = true;
+        }
+        Tables tableRefs = tableRefs();
+        List<Identifier> partition = null;
+        if (lexer.token() == Token.KW_PARTITION) {
+            partition = new ArrayList<>();
+            lexer.nextToken();
+            match(Token.PUNC_LEFT_PAREN);
+            partition.add(identifier());
+            while (lexer.token() != Token.EOF) {
+                if (lexer.token() == Token.PUNC_COMMA) {
+                    lexer.nextToken();
+                    partition.add(identifier());
+                    continue;
+                }
+                break;
+            }
+            match(Token.PUNC_RIGHT_PAREN);
+        }
+        match(Token.KW_SET);
+        List<Pair<Identifier, Expression>> values;
+        Identifier col = identifier();
+        match(Token.OP_EQUALS, Token.OP_ASSIGN);
+        Expression expr = exprParser.expression();
+        if (lexer.token() == Token.PUNC_COMMA) {
+            values = new LinkedList<Pair<Identifier, Expression>>();
+            values.add(new Pair<Identifier, Expression>(col, expr));
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                col = identifier();
+                match(Token.OP_EQUALS, Token.OP_ASSIGN);
+                expr = exprParser.expression();
+                values.add(new Pair<Identifier, Expression>(col, expr));
+            }
+        } else {
+            values = new ArrayList<Pair<Identifier, Expression>>(1);
+            values.add(new Pair<Identifier, Expression>(col, expr));
+        }
+        Expression where = null;
+        if (lexer.token() == Token.KW_WHERE) {
+            lexer.nextToken();
+            exprParser.setInWhere(true);
+            where = exprParser.expression();
+            exprParser.setInWhere(false);
+        }
+        OrderBy orderBy = null;
+        Limit limit = null;
+        orderBy = orderBy();
+        limit = limit(true);
+        DMLUpdateStatement update =
+            new DMLUpdateStatement(lowPriority, ignore, tableRefs, values, where, orderBy, limit, partition);
+        return update;
+    }
+
+    public DMLInsertReplaceStatement insert() throws SQLSyntaxErrorException {
+        match(Token.KW_INSERT);
+        int mode = DMLInsertReplaceStatement.UNDEF;
+        boolean ignore = false;
+        switch (lexer.token()) {
+            case Token.KW_LOW_PRIORITY:
+                lexer.nextToken();
+                mode = DMLInsertReplaceStatement.LOW;
+                break;
+            case Token.KW_DELAYED:
+                lexer.nextToken();
+                mode = DMLInsertReplaceStatement.DELAY;
+                break;
+            case Token.KW_HIGH_PRIORITY:
+                lexer.nextToken();
+                mode = DMLInsertReplaceStatement.HIGH;
+                break;
+        }
+        if (lexer.token() == Token.KW_IGNORE) {
+            ignore = true;
+            lexer.nextToken();
+        }
+        if (lexer.token() == Token.KW_INTO) {
+            lexer.nextToken();
+        }
+        Identifier table = identifier(true);
+        lexer.addParseInfo(ParseInfo.SINGLE_TABLE);
+        List<Pair<Identifier, Expression>> duplicateUpdate;
+        List<Identifier> columns;
+        List<RowExpression> rows;
+        QueryExpression select = null;
+        List<Identifier> partitions = null;
+        if (lexer.token() == Token.KW_PARTITION) {
+            partitions = new ArrayList<>();
+            lexer.nextToken();
+            match(Token.PUNC_LEFT_PAREN);
+            partitions.add(identifier());
+            while (lexer.token() != Token.EOF) {
+                if (lexer.token() == Token.PUNC_COMMA) {
+                    lexer.nextToken();
+                    partitions.add(identifier());
+                    continue;
+                }
+                break;
+            }
+            match(Token.PUNC_RIGHT_PAREN);
+        }
+        List<Expression> tempRowValue;
+        switch (lexer.token()) {
+            case Token.KW_SET:
+                lexer.nextToken();
+                columns = new LinkedList<Identifier>();
+                tempRowValue = new LinkedList<Expression>();
+                for (; ; lexer.nextToken()) {
+                    Identifier id = identifier();
+                    match(Token.OP_EQUALS, Token.OP_ASSIGN);
+                    Expression expr = exprParser.expression();
+                    columns.add(id);
+                    tempRowValue.add(expr);
+                    if (lexer.token() != Token.PUNC_COMMA) {
+                        break;
+                    }
+                }
+                rows = new ArrayList<RowExpression>(1);
+                rows.add(new RowExpression(tempRowValue));
+                duplicateUpdate = onDuplicateUpdate();
+                return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, rows, null, duplicateUpdate,
+                    partitions);
+            case Token.IDENTIFIER:
+                if (!equalsKeyword(Keywords.VALUE)) {
+                    break;
+                }
+            case Token.KW_VALUES:
+                lexer.nextToken();
+                columns = null;
+                rows = rowList();
+                duplicateUpdate = onDuplicateUpdate();
+                return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, rows, null, duplicateUpdate,
+                    partitions);
+            case Token.KW_SELECT:
+                columns = null;
+                select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                duplicateUpdate = onDuplicateUpdate();
+                return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, null, select, duplicateUpdate,
+                    partitions);
+            case Token.PUNC_LEFT_PAREN:
+                switch (lexer.nextToken()) {
+                    case Token.PUNC_LEFT_PAREN:
+                    case Token.KW_SELECT:
+                        columns = null;
+                        select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                        match(Token.PUNC_RIGHT_PAREN);
+                        duplicateUpdate = onDuplicateUpdate();
+                        return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, null, select,
+                            duplicateUpdate, partitions);
+                }
+                if (lexer.token() != Token.PUNC_RIGHT_PAREN) {
+                    columns = idList(false);
+                } else {
+                    columns = null;
+                }
+                match(Token.PUNC_RIGHT_PAREN);
+                switch (lexer.token()) {
+                    case Token.PUNC_LEFT_PAREN:
+                    case Token.KW_SELECT:
+                        select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                        duplicateUpdate = onDuplicateUpdate();
+                        return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, null, select,
+                            duplicateUpdate, partitions);
+                    case Token.KW_VALUES:
+                        lexer.nextToken();
+                        break;
+                    default:
+                        matchKeywords(Keywords.VALUE);
+                }
+                rows = rowList();
+                duplicateUpdate = onDuplicateUpdate();
+                return new DMLInsertReplaceStatement(true, mode, ignore, table, columns, rows, null, duplicateUpdate,
+                    partitions);
+        }
+        throw new SQLSyntaxErrorException("unexpected token for insert: " + lexer.token());
+    }
+
+    public DMLDeleteStatement delete() throws SQLSyntaxErrorException {
+        match(Token.KW_DELETE);
+        boolean lowPriority = false;
+        boolean quick = false;
+        boolean ignore = false;
+        loopOpt:
+        for (; ; lexer.nextToken()) {
+            switch (lexer.token()) {
+                case Token.KW_LOW_PRIORITY:
+                    lowPriority = true;
+                    break;
+                case Token.KW_IGNORE:
+                    ignore = true;
+                    break;
+                case Token.IDENTIFIER:
+                    if (lexer.parseKeyword() == Keywords.QUICK) {
+                        quick = true;
+                        break;
+                    }
+                default:
+                    break loopOpt;
+            }
+        }
+        List<Identifier> tempList;
+        Tables tempRefs;
+        Expression tempWhere;
+        List<Identifier> partition = null;
+        if (lexer.token() == Token.KW_FROM) {
+            lexer.nextToken();
+            Identifier id = identifier(true);
+            tempList = new ArrayList<Identifier>(1);
+            tempList.add(id);
+            lexer.addParseInfo(ParseInfo.SINGLE_TABLE);
+            switch (lexer.token()) {
+                case Token.PUNC_COMMA:
+                    tempList = buildIdList(id, true);
+                    lexer.removeParseInfo(ParseInfo.SINGLE_TABLE);
+                case Token.KW_USING:
+                    lexer.nextToken();
+                    tempRefs = tableRefs();
+                    lexer.removeParseInfo(ParseInfo.SINGLE_TABLE);
+                    if (lexer.token() == Token.KW_WHERE) {
+                        lexer.nextToken();
+                        tempWhere = exprParser.expression();
+                        return new DMLDeleteStatement(lowPriority, quick, ignore, tempList, tempRefs, tempWhere);
+                    }
+                    return new DMLDeleteStatement(lowPriority, quick, ignore, tempList, tempRefs);
+                case Token.KW_WHERE:
+                case Token.KW_ORDER:
+                case Token.KW_LIMIT:
+                    break;
+                case Token.KW_PARTITION:
+                    partition = new ArrayList<>();
+                    lexer.nextToken();
+                    match(Token.PUNC_LEFT_PAREN);
+                    partition.add(identifier());
+                    while (lexer.token() != Token.EOF) {
+                        if (lexer.token() == Token.PUNC_COMMA) {
+                            lexer.nextToken();
+                            partition.add(identifier());
+                            continue;
+                        }
+                        break;
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                    break;
+                default:
+                    return new DMLDeleteStatement(lowPriority, quick, ignore, id, partition);
+            }
+            tempWhere = null;
+            OrderBy orderBy = null;
+            Limit limit = null;
+            if (lexer.token() == Token.KW_WHERE) {
+                lexer.nextToken();
+                exprParser.setInWhere(true);
+                tempWhere = exprParser.expression();
+                exprParser.setInWhere(false);
+            }
+            if (lexer.token() == Token.KW_ORDER) {
+                orderBy = orderBy();
+            }
+            if (lexer.token() == Token.KW_LIMIT) {
+                limit = limit(true);
+            }
+            DMLDeleteStatement delete =
+                new DMLDeleteStatement(lowPriority, quick, ignore, id, tempWhere, orderBy, limit, partition);
+            return delete;
+        }
+        tempList = idList(true);
+        match(Token.KW_FROM);
+        tempRefs = tableRefs();
+        if (lexer.token() == Token.KW_WHERE) {
+            lexer.nextToken();
+            tempWhere = exprParser.expression();
+            return new DMLDeleteStatement(lowPriority, quick, ignore, tempList, tempRefs, tempWhere);
+        }
+        return new DMLDeleteStatement(lowPriority, quick, ignore, tempList, tempRefs);
     }
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {
@@ -156,11 +448,6 @@ public class MySQLDMLParser extends AbstractParser {
             default:
                 throw new SQLSyntaxErrorException("expect digit or ? after limit");
         }
-    }
-
-    public DMLSelectStatement select() throws SQLSyntaxErrorException {
-        MySQLDMLSelectParser parser = new MySQLDMLSelectParser(lexer, exprParser);
-        return parser.select();
     }
 
     protected OrderBy orderBy() throws SQLSyntaxErrorException {
@@ -545,6 +832,132 @@ public class MySQLDMLParser extends AbstractParser {
         return new Tables(list);
     }
 
+    private List<Pair<Identifier, Expression>> onDuplicateUpdate() throws SQLSyntaxErrorException {
+        if (lexer.token() != Token.KW_ON) {
+            return null;
+        }
+        lexer.nextToken();
+        matchKeywords(Keywords.DUPLICATE);
+        match(Token.KW_KEY);
+        match(Token.KW_UPDATE);
+        List<Pair<Identifier, Expression>> list;
+        Identifier col = identifier();
+        match(Token.OP_EQUALS, Token.OP_ASSIGN);
+        Expression expr = exprParser.expression();
+        if (lexer.token() == Token.PUNC_COMMA) {
+            list = new LinkedList<Pair<Identifier, Expression>>();
+            list.add(new Pair<Identifier, Expression>(col, expr));
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                col = identifier();
+                match(Token.OP_EQUALS, Token.OP_ASSIGN);
+                expr = exprParser.expression();
+                list.add(new Pair<Identifier, Expression>(col, expr));
+            }
+            return list;
+        }
+        list = new ArrayList<Pair<Identifier, Expression>>(1);
+        list.add(new Pair<Identifier, Expression>(col, expr));
+        return list;
+    }
+
+    private List<IndexHint> hintList() throws SQLSyntaxErrorException {
+        IndexHint hint = hint();
+        if (hint == null)
+            return null;
+        List<IndexHint> list;
+        IndexHint hint2 = hint();
+        if (hint2 == null) {
+            list = new ArrayList<IndexHint>(1);
+            list.add(hint);
+            return list;
+        }
+        list = new LinkedList<IndexHint>();
+        list.add(hint);
+        list.add(hint2);
+        for (; (hint2 = hint()) != null; list.add(hint2))
+            ;
+        return list;
+    }
+
+    private IndexHint hint() throws SQLSyntaxErrorException {
+        Integer action = null;
+        switch (lexer.token()) {
+            case Token.KW_USE:
+                action = IndexHint.ACTION_USE;
+                break;
+            case Token.KW_IGNORE:
+                action = IndexHint.ACTION_IGNORE;
+                break;
+            case Token.KW_FORCE:
+                action = IndexHint.ACTION_FORCE;
+                break;
+            default:
+                return null;
+        }
+        boolean isIndex = false;
+        switch (lexer.nextToken()) {
+            case Token.KW_INDEX:
+                isIndex = true;
+                break;
+            case Token.KW_KEY:
+                isIndex = false;
+                break;
+            default:
+                throw new SQLSyntaxErrorException("must be INDEX or KEY for hint type, not " + lexer.token());
+        }
+        Integer scope = null;
+        if (lexer.nextToken() == Token.KW_FOR) {
+            switch (lexer.nextToken()) {
+                case Token.KW_JOIN:
+                    lexer.nextToken();
+                    scope = IndexHint.SCOPE_JOIN;
+                    break;
+                case Token.KW_ORDER:
+                    lexer.nextToken();
+                    match(Token.KW_BY);
+                    scope = IndexHint.SCOPE_ORDER_BY;
+                    break;
+                case Token.KW_GROUP:
+                    lexer.nextToken();
+                    match(Token.KW_BY);
+                    scope = IndexHint.SCOPE_GROUP_BY;
+                    break;
+                default:
+                    throw new SQLSyntaxErrorException(
+                        "must be JOIN or ORDER or GROUP for hint scope, not " + lexer.token());
+            }
+        }
+
+        match(Token.PUNC_LEFT_PAREN);
+        List<Identifier> indexList = idNameList();
+        return new IndexHint(action, isIndex, scope, indexList);
+    }
+
+    private List<Expression> rowValue() throws SQLSyntaxErrorException {
+        match(Token.PUNC_LEFT_PAREN);
+        if (lexer.token() == Token.PUNC_RIGHT_PAREN) {
+            lexer.nextToken();
+            return Collections.emptyList();
+        }
+        List<Expression> row;
+        Expression expr = exprParser.expression();
+        if (lexer.token() == Token.PUNC_COMMA) {
+            row = new LinkedList<Expression>();
+            row.add(expr);
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                expr = exprParser.expression();
+                row.add(expr);
+            }
+        } else {
+            row = new ArrayList<Expression>(1);
+            row.add(expr);
+        }
+        match(Token.PUNC_RIGHT_PAREN);
+        return row;
+    }
+
     protected DMLQueryStatement buildUnionSelect(DMLSelectStatement select, boolean isSubQuery)
         throws SQLSyntaxErrorException {
         if (lexer.token() != Token.KW_UNION) {
@@ -705,77 +1118,22 @@ public class MySQLDMLParser extends AbstractParser {
         return list;
     }
 
-    private List<IndexHint> hintList() throws SQLSyntaxErrorException {
-        IndexHint hint = hint();
-        if (hint == null)
-            return null;
-        List<IndexHint> list;
-        IndexHint hint2 = hint();
-        if (hint2 == null) {
-            list = new ArrayList<IndexHint>(1);
-            list.add(hint);
-            return list;
-        }
-        list = new LinkedList<IndexHint>();
-        list.add(hint);
-        list.add(hint2);
-        for (; (hint2 = hint()) != null; list.add(hint2))
-            ;
-        return list;
-    }
-
-    private IndexHint hint() throws SQLSyntaxErrorException {
-        Integer action = null;
-        switch (lexer.token()) {
-            case Token.KW_USE:
-                action = IndexHint.ACTION_USE;
-                break;
-            case Token.KW_IGNORE:
-                action = IndexHint.ACTION_IGNORE;
-                break;
-            case Token.KW_FORCE:
-                action = IndexHint.ACTION_FORCE;
-                break;
-            default:
-                return null;
-        }
-        boolean isIndex = false;
-        switch (lexer.nextToken()) {
-            case Token.KW_INDEX:
-                isIndex = true;
-                break;
-            case Token.KW_KEY:
-                isIndex = false;
-                break;
-            default:
-                throw new SQLSyntaxErrorException("must be INDEX or KEY for hint type, not " + lexer.token());
-        }
-        Integer scope = null;
-        if (lexer.nextToken() == Token.KW_FOR) {
-            switch (lexer.nextToken()) {
-                case Token.KW_JOIN:
-                    lexer.nextToken();
-                    scope = IndexHint.SCOPE_JOIN;
-                    break;
-                case Token.KW_ORDER:
-                    lexer.nextToken();
-                    match(Token.KW_BY);
-                    scope = IndexHint.SCOPE_ORDER_BY;
-                    break;
-                case Token.KW_GROUP:
-                    lexer.nextToken();
-                    match(Token.KW_BY);
-                    scope = IndexHint.SCOPE_GROUP_BY;
-                    break;
-                default:
-                    throw new SQLSyntaxErrorException(
-                        "must be JOIN or ORDER or GROUP for hint scope, not " + lexer.token());
+    protected List<RowExpression> rowList() throws SQLSyntaxErrorException {
+        List<RowExpression> valuesList;
+        List<Expression> tempRowValue = rowValue();
+        if (lexer.token() == Token.PUNC_COMMA) {
+            valuesList = new LinkedList<RowExpression>();
+            valuesList.add(new RowExpression(tempRowValue));
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                tempRowValue = rowValue();
+                valuesList.add(new RowExpression(tempRowValue));
             }
+        } else {
+            valuesList = new ArrayList<RowExpression>(1);
+            valuesList.add(new RowExpression(tempRowValue));
         }
-
-        match(Token.PUNC_LEFT_PAREN);
-        List<Identifier> indexList = idNameList();
-        return new IndexHint(action, isIndex, scope, indexList);
+        return valuesList;
     }
 
 }

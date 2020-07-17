@@ -10,11 +10,27 @@ import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.SubpartitionDefinition;
 import parser.ast.fragment.ddl.*;
 import parser.ast.fragment.tableref.*;
-import parser.ast.stmt.dml.DMLSelectStatement;
+import parser.ast.stmt.compound.BeginEndStatement;
+import parser.ast.stmt.compound.DeclareStatement;
+import parser.ast.stmt.compound.condition.*;
+import parser.ast.stmt.compound.cursors.CursorCloseStatement;
+import parser.ast.stmt.compound.cursors.CursorDeclareStatement;
+import parser.ast.stmt.compound.cursors.CursorFetchStatement;
+import parser.ast.stmt.compound.cursors.CursorOpenStatement;
+import parser.ast.stmt.compound.flowcontrol.*;
+import parser.ast.stmt.dal.DALSetStatement;
+import parser.ast.stmt.dal.account.*;
+import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
+import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
+import parser.ast.stmt.ddl.*;
+import parser.ast.stmt.ddl.alter.Algorithm;
+import parser.ast.stmt.ddl.alter.Lock;
+import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
 import parser.ast.stmt.dml.DMLSelectStatement.LockMode;
-import parser.ast.stmt.dml.DMLSelectUnionStatement;
+import parser.ast.stmt.transactional.BeginStatement;
+import parser.ast.stmt.transactional.SetTransactionStatement;
 
 /**
  * @author Dagon0577
@@ -22,6 +38,12 @@ import parser.ast.stmt.dml.DMLSelectUnionStatement;
  */
 public interface Visitor {
     public void visit(DMLSelectStatement node);
+
+    public void visit(DMLUpdateStatement node);
+
+    public void visit(DMLInsertReplaceStatement node);
+
+    public void visit(DMLDeleteStatement node);
 
     public void visit(SelectOption node);
 
@@ -128,4 +150,106 @@ public interface Visitor {
     public void visit(IntervalPrimary node);
 
     public void visit(IndexHint node);
+
+    public void visit(DDLCreateDatabaseStatement node);
+
+    public void visit(DDLCreateEventStatement node);
+
+    public void visit(DDLCreateFunctionStatement node);
+
+    public void visit(DDLCreateIndexStatement node);
+
+    public void visit(DDLCreateLogfileGroupStatement node);
+
+    public void visit(DDLCreateProcedureStatement node);
+
+    public void visit(DDLCreateServerStatement node);
+
+    public void visit(DDLCreateSpatialReferenceSystemStatement node);
+
+    public void visit(DDLCreateTablespaceStatement node);
+
+    public void visit(DDLCreateTableStatement node);
+
+    public void visit(DDLCreateTriggerStatement node);
+
+    public void visit(DDLCreateViewStatement node);
+
+    public void visit(DALCreateResourceGroupStatement node);
+
+    public void visit(DALCreateRoleStatement node);
+
+    public void visit(DALCreateUserStatement node);
+
+    public void visit(DALSetStatement node);
+
+    public void visit(DALSetResourceGroupStatement node);
+
+    public void visit(DALSetDefaultRoleStatement node);
+
+    public void visit(DALSetPasswordStatement node);
+
+    public void visit(DALSetRoleStatement node);
+
+    public void visit(AuthOption node);
+
+    public void visit(ScheduleDefinition node);
+
+    public void visit(Characteristic node);
+
+    public void visit(IndexDefinition node);
+
+    public void visit(IndexOption node);
+
+    public void visit(ForeignKeyDefinition node);
+
+    public void visit(TableOptions node);
+
+    public void visit(Algorithm node);
+
+    public void visit(Lock node);
+
+    public void visit(BeginStatement node);
+
+    public void visit(BeginEndStatement node);
+
+    public void visit(DeclareStatement node);
+
+    public void visit(SetTransactionStatement node);
+
+    public void visit(CaseStatement node);
+
+    public void visit(IfStatement node);
+
+    public void visit(IterateStatement node);
+
+    public void visit(LeaveStatement node);
+
+    public void visit(LoopStatement node);
+
+    public void visit(RepeatStatement node);
+
+    public void visit(ReturnStatement node);
+
+    public void visit(WhileStatement node);
+
+    public void visit(ConditionValue node);
+
+    public void visit(DeclareConditionStatement node);
+
+    public void visit(DeclareHandlerStatement node);
+
+    public void visit(GetDiagnosticsStatement node);
+
+    public void visit(ResignalStatement node);
+
+    public void visit(SignalStatement node);
+
+    public void visit(CursorCloseStatement node);
+
+    public void visit(CursorDeclareStatement node);
+
+    public void visit(CursorFetchStatement node);
+
+    public void visit(CursorOpenStatement node);
 }

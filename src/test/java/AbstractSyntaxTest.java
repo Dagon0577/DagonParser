@@ -10,7 +10,7 @@ public class AbstractSyntaxTest extends TestCase {
 
     private static final boolean debug = false;
 
-    protected String output2MySQL(AST node, byte[] sql) {
+    protected String outputMySQL(AST node, byte[] sql) {
         OutputVisitor ov = new OutputVisitor(sql);
         node.accept(ov);
         String sb = new String(ov.getData());

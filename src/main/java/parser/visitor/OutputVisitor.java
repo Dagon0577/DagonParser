@@ -11,11 +11,28 @@ import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.SubpartitionDefinition;
 import parser.ast.fragment.ddl.*;
 import parser.ast.fragment.tableref.*;
-import parser.ast.stmt.dml.DMLSelectStatement;
+import parser.ast.stmt.SQLStatement;
+import parser.ast.stmt.compound.BeginEndStatement;
+import parser.ast.stmt.compound.DeclareStatement;
+import parser.ast.stmt.compound.condition.*;
+import parser.ast.stmt.compound.cursors.CursorCloseStatement;
+import parser.ast.stmt.compound.cursors.CursorDeclareStatement;
+import parser.ast.stmt.compound.cursors.CursorFetchStatement;
+import parser.ast.stmt.compound.cursors.CursorOpenStatement;
+import parser.ast.stmt.compound.flowcontrol.*;
+import parser.ast.stmt.dal.DALSetStatement;
+import parser.ast.stmt.dal.account.*;
+import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
+import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
+import parser.ast.stmt.ddl.*;
+import parser.ast.stmt.ddl.alter.Algorithm;
+import parser.ast.stmt.ddl.alter.Lock;
+import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
 import parser.ast.stmt.dml.DMLSelectStatement.LockMode;
-import parser.ast.stmt.dml.DMLSelectUnionStatement;
+import parser.ast.stmt.transactional.BeginStatement;
+import parser.ast.stmt.transactional.SetTransactionStatement;
 import parser.token.Functions;
 import parser.token.IntervalUnit;
 import parser.token.Keywords;
@@ -41,7 +58,6 @@ public class OutputVisitor implements Visitor {
     protected Object[] params; // 替换占位符?的实际参数
     protected int paramStart = 0;
     protected List<Tuple2<Integer, Integer>> paramIndexs; // 由占位符?分割的格式化后的SQL段<位置,长度>
-    protected long DNID = 0;
     protected List<Tuple2<String, String>> needSelects;
     protected boolean ignoreLimit;
 
@@ -208,7 +224,6 @@ public class OutputVisitor implements Visitor {
         if (where != null) {
             appendable.append(t(Token.KW_WHERE), 0);
             print(where);
-            DNID = 0;
         }
         GroupBy group = node.getGroupBy();
         if (group != null) {
@@ -251,6 +266,200 @@ public class OutputVisitor implements Visitor {
         print(node.getLock());
         if (node.isInParentheses()) {
             appendable.append(')');
+        }
+    }
+
+    @Override
+    public void visit(DMLUpdateStatement node) {
+        print(node.getWithClause());
+        appendable.append(t(Token.KW_UPDATE), 2);
+        if (node.isLowPriority()) {
+            appendable.append(t(Token.KW_LOW_PRIORITY), 2);
+        }
+        if (node.isIgnore()) {
+            appendable.append(t(Token.KW_IGNORE), 2);
+        }
+        print(node.getTables());
+        List<Identifier> partition = node.getPartition();
+        if (partition != null) {
+            Iterator<Identifier> itor = partition.iterator();
+            appendable.append(t(Token.KW_PARTITION), 1).append('(');
+            while (itor.hasNext()) {
+                appendable.append(itor.next().getIdText());
+                if (itor.hasNext()) {
+                    appendable.append(',');
+                }
+            }
+            appendable.append(')');
+        }
+        appendable.append(t(Token.KW_SET), 0);
+        boolean isFst = true;
+        for (Pair<Identifier, Expression> p : node.getValues()) {
+            if (isFst) {
+                isFst = false;
+            } else {
+                appendable.append(',');
+            }
+            print(p.getKey());
+            appendable.append('=');
+            print(p.getValue());
+        }
+        Expression where = node.getWhere();
+        if (where != null) {
+            appendable.append(t(Token.KW_WHERE), 0);
+            print(where);
+        }
+        OrderBy orderBy = node.getOrderBy();
+        if (orderBy != null) {
+            appendable.append(' ');
+            print(orderBy);
+        }
+        Limit limit = node.getLimit();
+        if (limit != null) {
+            appendable.append(' ');
+            print(limit);
+        }
+    }
+
+    @Override
+    public void visit(DMLInsertReplaceStatement node) {
+        boolean isInsert = node.isInsert();
+        if (isInsert) {
+            appendable.append(t(Token.KW_INSERT));
+        } else {
+            appendable.append(t(Token.KW_REPLACE));
+        }
+        switch (node.getMode()) {
+            case DMLInsertReplaceStatement.DELAY:
+                appendable.append(t(Token.KW_DELAYED), 1);
+                break;
+            case DMLInsertReplaceStatement.HIGH:
+                if (isInsert) {
+                    appendable.append(t(Token.KW_HIGH_PRIORITY), 1);
+                }
+                break;
+            case DMLInsertReplaceStatement.LOW:
+                appendable.append(t(Token.KW_LOW_PRIORITY), 1);
+                break;
+        }
+        if (isInsert && node.isIgnore()) {
+            appendable.append(t(Token.KW_IGNORE), 1);
+        }
+        appendable.append(t(Token.KW_INTO), 0);
+        print(node.getTable());
+        if (node.getTable() != null) {
+            appendable.append(" ");
+        }
+        List<Identifier> partition = node.getPartitions();
+        if (partition != null) {
+            Iterator<Identifier> itor = partition.iterator();
+            appendable.append(t(Token.KW_PARTITION), 1).append('(');
+            while (itor.hasNext()) {
+                appendable.append(itor.next().getIdText());
+                if (itor.hasNext()) {
+                    appendable.append(',');
+                }
+            }
+            appendable.append(')');
+        }
+        List<Identifier> cols = node.getColumns();
+        if (cols != null && !cols.isEmpty()) {
+            appendable.append('(');
+            printList(cols);
+            appendable.append(')');
+        }
+
+        QueryExpression select = node.getSelect();
+        if (select == null) {
+            appendable.append(t(Token.KW_VALUES), 2);
+            List<RowExpression> rows = node.getRows();
+            if (rows != null && !rows.isEmpty()) {
+                boolean isFst = true;
+                for (RowExpression row : rows) {
+                    if (row == null) {
+                        continue;
+                    }
+                    if (isFst) {
+                        isFst = false;
+                    } else {
+                        appendable.append(',');
+                    }
+                    appendable.append('(');
+                    printList(row.getRowExprList());
+                    appendable.append(')');
+                }
+            }
+        } else {
+            print(select);
+        }
+        if (isInsert) {
+            List<Pair<Identifier, Expression>> dup = node.getDuplicateUpdate();
+            if (dup != null && !dup.isEmpty()) {
+                appendable.append(t(Token.KW_ON), 1).append(k(Keywords.DUPLICATE), 1).append(t(Token.KW_KEY), 1)
+                    .append(t(Token.KW_UPDATE), 0);
+                boolean isFst = true;
+                for (Pair<Identifier, Expression> p : dup) {
+                    if (isFst) {
+                        isFst = false;
+                    } else {
+                        appendable.append(',').append(' ');
+                    }
+                    print(p.getKey());
+                    appendable.append('=');
+                    print(p.getValue());
+                }
+            }
+        }
+    }
+
+    @Override
+    public void visit(DMLDeleteStatement node) {
+        print(node.getWithClause());
+        appendable.append(t(Token.KW_DELETE), 2);
+        if (node.isLowPriority()) {
+            appendable.append(t(Token.KW_LOW_PRIORITY), 2);
+        }
+        if (node.isQuick()) {
+            appendable.append(k(Keywords.QUICK), 2);
+        }
+        if (node.isIgnore()) {
+            appendable.append(t(Token.KW_IGNORE), 2);
+        }
+        Tables tableRefs = node.getTableRefs();
+        if (tableRefs == null) {
+            appendable.append(t(Token.KW_FROM), 2);
+            print(node.getTableNames().get(0));
+        } else {
+            printList(node.getTableNames());
+            appendable.append(t(Token.KW_FROM), 0);
+            print(node.getTableRefs());
+        }
+        List<Identifier> partition = node.getPartition();
+        if (partition != null) {
+            Iterator<Identifier> itor = partition.iterator();
+            appendable.append(t(Token.KW_PARTITION), 1).append('(');
+            while (itor.hasNext()) {
+                appendable.append(itor.next().getIdText());
+                if (itor.hasNext()) {
+                    appendable.append(',');
+                }
+            }
+            appendable.append(')');
+        }
+        Expression where = node.getWhereCondition();
+        if (where != null) {
+            appendable.append(t(Token.KW_WHERE), 0);
+            print(where);
+        }
+        OrderBy orderBy = node.getOrderBy();
+        if (orderBy != null) {
+            appendable.append(' ');
+            print(orderBy);
+        }
+        Limit limit = node.getLimit();
+        if (limit != null) {
+            appendable.append(' ');
+            print(limit);
         }
     }
 
@@ -1072,41 +1281,28 @@ public class OutputVisitor implements Visitor {
 
     @Override
     public void visit(BinaryOperatorExpression node) {
-        boolean isDNID = false;
         Expression left = node.getLeftOprand();
         Expression right = node.getRightOprand();
-        if (DNID != 0) {
-            if (left instanceof Identifier && ((Identifier)left).getIdText().length == 4) {
-                Identifier name = (Identifier)left;
-            }
-            if ((!isDNID) && (right instanceof Identifier && ((Identifier)right).getIdText().length == 4)) {
-                Identifier name = (Identifier)right;
-            }
+        boolean paren = node.isLeftCombine() ? left.getPrecedence() < node.getPrecedence() && left.getPrecedence() > 0 :
+            left.getPrecedence() <= node.getPrecedence() && left.getPrecedence() > 0;
+        if (paren || left instanceof IsExpression) {
+            appendable.append('(');
         }
-        if (!isDNID) {
-            boolean paren =
-                node.isLeftCombine() ? left.getPrecedence() < node.getPrecedence() && left.getPrecedence() > 0 :
-                    left.getPrecedence() <= node.getPrecedence() && left.getPrecedence() > 0;
-            if (paren || left instanceof IsExpression) {
-                appendable.append('(');
-            }
-            print(left);
-            if (paren || left instanceof IsExpression) {
-                appendable.append(')');
-            }
-            appendable.append(node.getOperator());
-            paren = node.isLeftCombine() ? right.getPrecedence() <= node.getPrecedence() && right.getPrecedence() > 0 :
-                right.getPrecedence() < node.getPrecedence() && right.getPrecedence() > 0;
-            if (paren) {
-                appendable.append('(');
-            }
-            print(right);
-            if (paren) {
-                appendable.append(')');
-            }
-        } else {
-            appendable.append("TRUE");
+        print(left);
+        if (paren || left instanceof IsExpression) {
+            appendable.append(')');
         }
+        appendable.append(node.getOperator());
+        paren = node.isLeftCombine() ? right.getPrecedence() <= node.getPrecedence() && right.getPrecedence() > 0 :
+            right.getPrecedence() < node.getPrecedence() && right.getPrecedence() > 0;
+        if (paren) {
+            appendable.append('(');
+        }
+        print(right);
+        if (paren) {
+            appendable.append(')');
+        }
+
     }
 
     @Override
@@ -1866,5 +2062,1956 @@ public class OutputVisitor implements Visitor {
         }
         appendable.append(')');
     }
+
+    @Override
+    public void visit(DDLCreateDatabaseStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(t(Token.KW_DATABASE), 0);
+        if (node.isIfNotExist()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 0).append(t(Token.KW_EXISTS), 2);
+        }
+        print(node.getDb());
+        if (node.getCharset() != null) {
+            appendable.append(t(Token.KW_CHARACTER), 0).append(t(Token.KW_SET), 2);
+            print(node.getCharset());
+        }
+        if (node.getCollate() != null) {
+            appendable.append(t(Token.KW_COLLATE), 0);
+            print(node.getCollate());
+        }
+        if (node.getEncryption() != null) {
+            appendable.append(t(Token.KW_DEFAULT), 0).append(k(Keywords.ENCRYPTION), 2);
+            if (node.getEncryption()) {
+                appendable.append("'Y'");
+            } else {
+                appendable.append("'N'");
+            }
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateEventStatement node) {
+        appendable.append(t(Token.KW_CREATE), 2);
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER)).append('=');
+            print(node.getDefiner());
+            appendable.append(' ');
+        }
+        appendable.append(k(Keywords.EVENT), 2);
+        if (node.isIfNotExist()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 0).append(t(Token.KW_EXISTS), 2);
+        }
+        print(node.getEvent());
+        if (node.getSchedule() != null) {
+            appendable.append(' ');
+            appendable.append(t(Token.KW_ON), 2);
+            appendable.append(k(Keywords.SCHEDULE), 2);
+            print(node.getSchedule());
+        }
+        if (node.getPreserve() != null) {
+            appendable.append(' ');
+            appendable.append(t(Token.KW_ON), 2);
+            appendable.append(k(Keywords.COMPLETION), 2);
+            if (!node.getPreserve()) {
+                appendable.append(t(Token.KW_NOT), 2);
+            }
+            appendable.append(k(Keywords.PRESERVE));
+        }
+        if (node.getEnableType() != null) {
+            appendable.append(' ');
+            switch (node.getEnableType()) {
+                case DDLCreateEventStatement.ENABLE:
+                    appendable.append(k(Keywords.ENABLE));
+                    break;
+                case DDLCreateEventStatement.DISABLE:
+                    appendable.append(k(Keywords.DISABLE));
+                    break;
+                case DDLCreateEventStatement.DISABLE_ON_SLAVE:
+                    appendable.append(k(Keywords.DISABLE));
+                    appendable.append(t(Token.KW_ON), 0);
+                    appendable.append(k(Keywords.SLAVE));
+                    break;
+            }
+        }
+        if (node.getComment() != null) {
+            appendable.append(k(Keywords.COMMENT), 0);
+            print(node.getComment());
+        }
+        if (node.getEventBody() != null) {
+            appendable.append(k(Keywords.DO), 0);
+            print(node.getEventBody());
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateFunctionStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER), 1).append('=');
+            print(node.getDefiner());
+        }
+        appendable.append(t(Token.KW_FUNCTION), 0);
+        print(node.getName());
+        appendable.append('(');
+        List<Pair<Identifier, DataType>> params = node.getParameters();
+        if (params != null && !params.isEmpty()) {
+            boolean first = true;
+            for (Pair<Identifier, DataType> param : params) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(param.getKey());
+                appendable.append(' ');
+                print(param.getValue());
+            }
+        }
+        appendable.append(')');
+        appendable.append(k(Keywords.RETURNS), 2);
+        print(node.getReturns());
+        List<Characteristic> list = node.getCharacteristics();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(' ');
+            printList(list, ' ');
+        }
+        appendable.append(' ');
+        print(node.getStmt());
+        appendable.isLastSemicolon();
+    }
+
+    @Override
+    public void visit(DDLCreateIndexStatement node) {
+        appendable.append(t(Token.KW_CREATE), 2);
+        if (node.getType() != null) {
+            switch (node.getType()) {
+                case DDLCreateIndexStatement.UNIQUE:
+                    appendable.append(t(Token.KW_UNIQUE), 2);
+                    break;
+                case DDLCreateIndexStatement.FULLTEXT:
+                    appendable.append(t(Token.KW_FULLTEXT), 2);
+                    break;
+                case DDLCreateIndexStatement.SPATIAL:
+                    appendable.append(t(Token.KW_SPATIAL), 2);
+                    break;
+            }
+        }
+        appendable.append(t(Token.KW_INDEX), 2);
+        print(node.getName());
+        appendable.append(' ');
+        if (node.getIndexType() != null) {
+            appendable.append(t(Token.KW_USING));
+            switch (node.getIndexType()) {
+                case IndexOption.BTREE:
+                    appendable.append(k(Keywords.BTREE), 0);
+                    break;
+                case IndexOption.HASH:
+                    appendable.append(k(Keywords.HASH), 0);
+                    break;
+            }
+        }
+        appendable.append(t(Token.KW_ON), 2);
+        print(node.getTable());
+        appendable.append('(');
+        List<IndexColumnName> cols = node.getColumns();
+        if (cols != null) {
+            for (int i = 0, size = cols.size(); i < size; i++) {
+                if (i != 0) {
+                    appendable.append(',');
+                }
+                print(cols.get(i));
+            }
+        }
+        appendable.append(')');
+        List<IndexOption> options = node.getOptions();
+        if (options != null) {
+            for (IndexOption option : options) {
+                print(option);
+            }
+        }
+        if (node.getAlgorithm() != null) {
+            appendable.append(' ');
+            switch (node.getAlgorithm()) {
+                case DDLCreateIndexStatement.ALGORITHM_DEFAULT:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=').append(t(Token.KW_DEFAULT));
+                    break;
+                case DDLCreateIndexStatement.ALGORITHM_COPY:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=').append("COPY");
+                    break;
+                case DDLCreateIndexStatement.ALGORITHM_INPLACE:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=').append("INPLACE");
+                    break;
+            }
+        }
+        if (node.getLockOption() != null) {
+            appendable.append(' ');
+            switch (node.getLockOption()) {
+                case DDLCreateIndexStatement.LOCK_DEFAULT:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append(t(Token.KW_DEFAULT));
+                    break;
+                case DDLCreateIndexStatement.LOCK_NONE:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append(k(Keywords.NONE));
+                    break;
+                case DDLCreateIndexStatement.LOCK_SHARED:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append("SHARED");
+                    break;
+                case DDLCreateIndexStatement.LOCK_EXCLUSIVE:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append("EXCLUSIVE");
+                    break;
+            }
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateLogfileGroupStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(k(Keywords.LOGFILE), 0).append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        appendable.append(t(Token.KW_ADD), 0).append(k(Keywords.UNDOFILE), 2);
+        print(node.getUndoFile());
+        if (node.getInitialSize() != null) {
+            appendable.append(k(Keywords.INITIAL_SIZE), 1).append('=');
+            print(node.getInitialSize());
+        }
+        if (node.getUndoBufferSize() != null) {
+            appendable.append(k(Keywords.UNDO_BUFFER_SIZE), 1).append('=');
+            print(node.getUndoBufferSize());
+        }
+        if (node.getRedoBufferSize() != null) {
+            appendable.append(k(Keywords.REDO_BUFFER_SIZE), 1).append('=');
+            print(node.getRedoBufferSize());
+        }
+        if (node.getNodeGroupId() != null) {
+            appendable.append(k(Keywords.NODEGROUP), 1).append('=');
+            print(node.getNodeGroupId());
+        }
+        if (node.isWait()) {
+            appendable.append(k(Keywords.WAIT), 1);
+        }
+        if (node.getComment() != null) {
+            appendable.append(k(Keywords.COMMENT), 1).append('=');
+            print(node.getComment());
+        }
+        if (node.getEngine() != null) {
+            appendable.append(k(Keywords.ENGINE), 1).append('=');
+            print(node.getEngine());
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateProcedureStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER), 1).append('=');
+            print(node.getDefiner());
+        }
+        appendable.append(t(Token.KW_PROCEDURE), 0);
+        print(node.getName());
+        appendable.append('(');
+        List<Tuple3<Integer, Identifier, DataType>> params = node.getParameters();
+        if (params != null && !params.isEmpty()) {
+            boolean first = true;
+            for (Tuple3<Integer, Identifier, DataType> param : params) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                if (param._1() != null) {
+                    switch (param._1()) {
+                        case DDLCreateProcedureStatement.IN:
+                            appendable.append(t(Token.KW_IN), 2);
+                            break;
+                        case DDLCreateProcedureStatement.OUT:
+                            appendable.append(t(Token.KW_OUT), 2);
+                            break;
+                        case DDLCreateProcedureStatement.INOUT:
+                            appendable.append(t(Token.KW_INOUT), 2);
+                            break;
+                    }
+                }
+                print(param._2());
+                appendable.append(' ');
+                print(param._3());
+            }
+        }
+        appendable.append(')');
+        List<Characteristic> list = node.getCharacteristics();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(' ');
+            printList(list, ' ');
+        }
+        appendable.append(' ');
+        print(node.getStmt());
+        appendable.isLastSemicolon();
+    }
+
+    @Override
+    public void visit(DDLCreateServerStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(k(Keywords.SERVER), 0);
+        print(node.getServerName());
+        appendable.append(t(Token.KW_FOREIGN), 0).append(k(Keywords.DATA)).append(k(Keywords.WRAPPER), 0);
+        print(node.getWrapperName());
+        if (node.getOptions() != null && !node.getOptions().isEmpty()) {
+            appendable.append(k(Keywords.OPTIONS), 1).append('(');
+            boolean first = true;
+            for (Pair<Integer, Literal> option : node.getOptions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                switch (option.getKey()) {
+                    case DDLCreateServerStatement.HOST:
+                        appendable.append(k(Keywords.HOST));
+                        break;
+                    case DDLCreateServerStatement.DATABASE:
+                        appendable.append(t(Token.KW_DATABASE));
+                        break;
+                    case DDLCreateServerStatement.USER:
+                        appendable.append(k(Keywords.USER));
+                        break;
+                    case DDLCreateServerStatement.PASSWORD:
+                        appendable.append(k(Keywords.PASSWORD));
+                        break;
+                    case DDLCreateServerStatement.SOCKET:
+                        appendable.append(k(Keywords.SOCKET));
+                        break;
+                    case DDLCreateServerStatement.OWNER:
+                        appendable.append(k(Keywords.OWNER));
+                        break;
+                    case DDLCreateServerStatement.PORT:
+                        appendable.append(k(Keywords.PORT));
+                        break;
+                }
+                appendable.append(' ');
+                print(option.getValue());
+            }
+            appendable.append(')');
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateSpatialReferenceSystemStatement node) {
+        appendable.append(t(Token.KW_CREATE), 2);
+        if (node.isOrReplace()) {
+            appendable.append(t(Token.KW_OR)).append(t(Token.KW_REPLACE), 0);
+        }
+        appendable.append(t(Token.KW_SPATIAL)).append(" REFERENCE ").append(t(Token.KW_SYSTEM), 2);
+        if (node.isIfNotExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 0).append(t(Token.KW_EXISTS), 2);
+        }
+        print(node.getSrid());
+        if (node.getAttributies() != null) {
+            for (Tuple3<Integer, LiteralString, Long> tuple : node.getAttributies()) {
+                appendable.append(' ');
+                switch (tuple._1()) {
+                    case DDLCreateSpatialReferenceSystemStatement.NAME:
+                        appendable.append(k(Keywords.NAME), 2);
+                        print(tuple._2());
+                        break;
+                    case DDLCreateSpatialReferenceSystemStatement.DEFINITION:
+                        appendable.append(k(Keywords.DEFINITION), 2);
+                        print(tuple._2());
+                        break;
+                    case DDLCreateSpatialReferenceSystemStatement.ORGANIZATION:
+                        appendable.append(k(Keywords.ORGANIZATION), 2);
+                        print(tuple._2());
+                        appendable.append(k(Keywords.IDENTIFIED), 0).append(t(Token.KW_BY), 2);
+                        print(tuple._3());
+                        break;
+                    case DDLCreateSpatialReferenceSystemStatement.DESCRIPTION:
+                        appendable.append(k(Keywords.DESCRIPTION), 2);
+                        print(tuple._2());
+                        break;
+                }
+            }
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateTablespaceStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.isUndo()) {
+            appendable.append(t(Token.KW_UNDO), 1);
+        }
+        appendable.append(k(Keywords.TABLESPACE), 0);
+        print(node.getName());
+        if (node.getFileName() != null) {
+            appendable.append(t(Token.KW_ADD), 0).append(k(Keywords.DATAFILE), 2);
+            print(node.getFileName());
+        }
+        if (node.getFileBlockSize() != null) {
+            appendable.append(k(Keywords.FILE_BLOCK_SIZE), 1).append('=');
+            print(node.getFileBlockSize());
+        }
+        if (node.getEncryption() != null) {
+            appendable.append(k(Keywords.ENCRYPTION), 1).append('=');
+            if (node.getEncryption()) {
+                appendable.append("'Y'");
+            } else {
+                appendable.append("'N'");
+            }
+        }
+        if (node.getLogFileGroup() != null) {
+            appendable.append(t(Token.KW_USE), 1).append(k(Keywords.LOGFILE), 0).append(t(Token.KW_GROUP), 2);
+            print(node.getLogFileGroup());
+        }
+        if (node.getExtentSize() != null) {
+            appendable.append(k(Keywords.EXTENT_SIZE), 1).append('=');
+            print(node.getExtentSize());
+        }
+        if (node.getInitialSize() != null) {
+            appendable.append(k(Keywords.INITIAL_SIZE), 1).append('=');
+            print(node.getInitialSize());
+        }
+        if (node.getAutoextendSize() != null) {
+            appendable.append(k(Keywords.AUTOEXTEND_SIZE), 1).append('=');
+            print(node.getAutoextendSize());
+        }
+        if (node.getMaxSize() != null) {
+            appendable.append(k(Keywords.MAX_SIZE), 1).append('=');
+            print(node.getMaxSize());
+        }
+        if (node.getNodeGroupId() != null) {
+            appendable.append(k(Keywords.NODEGROUP), 1).append('=');
+            print(node.getNodeGroupId());
+        }
+        if (node.isWait()) {
+            appendable.append(k(Keywords.WAIT), 1);
+        }
+        if (node.getComment() != null) {
+            appendable.append(k(Keywords.COMMENT), 1).append('=');
+            print(node.getComment());
+        }
+        if (node.getEngine() != null) {
+            appendable.append(k(Keywords.ENGINE), 1).append('=');
+            print(node.getEngine());
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateTableStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.isTemporary()) {
+            appendable.append(k(Keywords.TEMPORARY), 1);
+        }
+        appendable.append(t(Token.KW_TABLE), 0);
+        if (node.isIfNotExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 1).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getTableName());
+        appendable.append('(').append('\n').append(' ').append(' ');
+        List<Pair<Identifier, ColumnDefinition>> columns = node.getColumns();
+        if (columns != null) {
+            for (int i = 0, size = columns.size(); i < size; i++) {
+                if (i != 0) {
+                    appendable.append(',').append('\n').append(' ').append(' ');
+                }
+                Pair<Identifier, ColumnDefinition> column = columns.get(i);
+                print(column.getKey());
+                appendable.append(' ');
+                print(column.getValue());
+            }
+        }
+        if (node.getPrimaryKey() != null) {
+            appendable.append(',').append('\n');
+            print(node.getPrimaryKey());
+        }
+        if (node.getUniqueKeys() != null) {
+            for (IndexDefinition key : node.getUniqueKeys()) {
+                appendable.append(',').append('\n');
+                print(key);
+            }
+        }
+        if (node.getKeys() != null) {
+            for (IndexDefinition key : node.getKeys()) {
+                appendable.append(',').append('\n');
+                print(key);
+            }
+        }
+        if (node.getFullTextKeys() != null) {
+            for (IndexDefinition key : node.getFullTextKeys()) {
+                appendable.append(',').append('\n');
+                print(key);
+            }
+        }
+        if (node.getSpatialKeys() != null) {
+            for (IndexDefinition key : node.getSpatialKeys()) {
+                appendable.append(',').append('\n');
+                print(key);
+            }
+        }
+        List<ForeignKeyDefinition> foreignKeyDefs = node.getForeignKeys();
+        if (foreignKeyDefs != null) {
+            for (int i = 0, size = foreignKeyDefs.size(); i < size; i++) {
+                appendable.append(',').append('\n');
+                print(foreignKeyDefs.get(i));
+            }
+        }
+        List<Identifier> checksName = node.getChecksName();
+        List<Pair<Expression, Boolean>> checks = node.getChecks();
+        if (checks != null) {
+            for (int i = 0, size = checks.size(); i < size; ++i) {
+                Pair<Expression, Boolean> pair = checks.get(i);
+                Identifier checkName = checksName.get(i);
+                appendable.append(',').append('\n');
+                appendable.append(t(Token.KW_CONSTRAINT), 2);
+                if (checkName != null) {
+                    print(checkName);
+                }
+                appendable.append(t(Token.KW_CHECK), 1).append('(');
+                print(pair.getKey());
+                appendable.append(')');
+                if (pair.getValue() != null) {
+                    if (pair.getValue() == true) {
+                        appendable.append(" ENFORCED");
+                    } else {
+                        appendable.append(t(Token.KW_NOT), 2);
+                        appendable.append("ENFORCED");
+                    }
+                }
+            }
+        }
+        appendable.append('\n').append(')');
+        print(node.getTableOptions());
+        if (node.getPartitionOptions() != null) {
+            appendable.append(' ');
+            print(node.getPartitionOptions());
+        }
+        if (node.getIsIgnore() != null && node.getIsIgnore()) {
+            appendable.append(t(Token.KW_IGNORE), 2);
+        } else if (node.getIsReplace() != null && node.getIsReplace()) {
+            appendable.append(t(Token.KW_REPLACE), 2);
+        }
+        if (node.getQueryExpression() != null) {
+            appendable.append(t(Token.KW_AS), 2);
+            print(node.getQueryExpression());
+        }
+    }
+
+    @Override
+    public void visit(DDLCreateTriggerStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER), 1).append('=');
+            print(node.getDefiner());
+        }
+        appendable.append(t(Token.KW_TRIGGER), 0);
+        print(node.getName());
+        if (node.isBefore()) {
+            appendable.append(t(Token.KW_BEFORE), 1);
+        } else {
+            appendable.append(k(Keywords.AFTER), 1);
+        }
+        switch (node.getEvent()) {
+            case DDLCreateTriggerStatement.INSERT:
+                appendable.append(t(Token.KW_INSERT), 1);
+                break;
+            case DDLCreateTriggerStatement.UPDATE:
+                appendable.append(t(Token.KW_UPDATE), 1);
+                break;
+            case DDLCreateTriggerStatement.DELETE:
+                appendable.append(t(Token.KW_DELETE), 1);
+                break;
+        }
+        appendable.append(t(Token.KW_ON), 0);
+        print(node.getTable());
+        appendable.append(t(Token.KW_FOR), 0).append(t(Token.KW_EACH)).append(t(Token.KW_ROW), 1);
+        if (node.getFollows() != null) {
+            appendable.append(node.getFollows() ? k(Keywords.FOLLOWS) : k(Keywords.PRECEDES), 0);
+            print(node.getOtherName());
+        }
+        appendable.append(' ');
+        print(node.getStmt());
+        appendable.isLastSemicolon();
+    }
+
+    @Override
+    public void visit(DDLCreateViewStatement node) {
+        appendable.append(t(Token.KW_CREATE));
+        if (node.isOrReplace()) {
+            appendable.append(t(Token.KW_OR), 0).append(t(Token.KW_REPLACE));
+        }
+        if (node.getAlgorithm() != null) {
+            switch (node.getAlgorithm()) {
+                case DDLCreateViewStatement.UNDEFINED:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=').append(k(Keywords.UNDEFINED));
+                    break;
+                case DDLCreateViewStatement.MERGE:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=').append(k(Keywords.MERGE));
+                    break;
+                case DDLCreateViewStatement.TEMPTABLE:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=').append(k(Keywords.TEMPTABLE));
+                    break;
+            }
+        }
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER), 1).append('=');
+            print(node.getDefiner());
+        }
+        if (node.getSqlSecurityDefiner() != null) {
+            appendable.append(t(Token.KW_SQL), 0).append(k(Keywords.SECURITY), 2)
+                .append(node.getSqlSecurityDefiner() ? k(Keywords.DEFINER) : k(Keywords.INVOKER));
+        }
+        appendable.append(k(Keywords.VIEW), 0);
+        print(node.getName());
+        List<Identifier> columnsList = node.getColumns();
+        if (columnsList != null && !columnsList.isEmpty()) {
+            appendable.append('(');
+            boolean isFst = true;
+            for (Identifier p : columnsList) {
+                if (isFst) {
+                    isFst = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(p);
+            }
+            appendable.append(')');
+        }
+        appendable.append(t(Token.KW_AS), 0);
+        print(node.getStmt());
+        if (node.isWithCheckOption()) {
+            appendable.append(t(Token.KW_WITH), 0);
+            if (node.getCascaded() != null) {
+                appendable.append(node.getCascaded() ? k(Keywords.CASCADED) : k(Keywords.LOCAL), 2);
+            }
+            appendable.append(t(Token.KW_CHECK)).append(t(Token.KW_OPTION), 1);
+        }
+    }
+
+    @Override
+    public void visit(DALCreateResourceGroupStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(k(Keywords.RESOURCE), 0).append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        appendable.append(k(Keywords.TYPE), 1).append('=');
+        if (node.isSystemOrUser()) {
+            appendable.append(t(Token.KW_SYSTEM));
+        } else {
+            appendable.append(k(Keywords.USER));
+        }
+        if (node.getVcpus() != null) {
+            appendable.append(k(Keywords.VCPU), 1).append('=');
+            printList(node.getVcpus());
+        }
+        if (node.getThreadPriority() != null) {
+            appendable.append(k(Keywords.THREAD_PRIORITY), 1).append('=');
+            print(node.getThreadPriority());
+        }
+        if (node.getEnable() != null) {
+            if (node.getEnable()) {
+                appendable.append(k(Keywords.ENABLE), 1);
+            } else {
+                appendable.append(k(Keywords.DISABLE), 1);
+            }
+        }
+
+    }
+
+    @Override
+    public void visit(DALCreateRoleStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(k(Keywords.ROLE), 0);
+        if (node.isIfNotExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 1).append(t(Token.KW_EXISTS), 0);
+        }
+        printList(node.getRoles());
+    }
+
+    @Override
+    public void visit(DALCreateUserStatement node) {
+        appendable.append(t(Token.KW_CREATE)).append(k(Keywords.USER), 0);
+        if (node.isIfNotExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_NOT), 1).append(t(Token.KW_EXISTS), 0);
+        }
+        boolean first = true;
+        for (Pair<Expression, AuthOption> p : node.getUsers()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            print(p.getKey());
+            appendable.append(' ');
+            print(p.getValue());
+        }
+        if (node.getRoles() != null && !node.getRoles().isEmpty()) {
+            appendable.append(t(Token.KW_DEFAULT), 0).append(k(Keywords.ROLE), 2);
+            printList(node.getRoles());
+        }
+        if (node.getRequireNone() != null) {
+            appendable.append(t(Token.KW_REQUIRE), 0).append(k(Keywords.NONE));
+        } else if (node.getTlsOptions() != null) {
+            appendable.append(t(Token.KW_REQUIRE), 0);
+            first = true;
+            for (Pair<Integer, LiteralString> p : node.getTlsOptions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(t(Token.KW_AND), 0);
+                }
+                switch (p.getKey()) {
+                    case DALCreateUserStatement.TLS_SSL:
+                        appendable.append(t(Token.KW_SSL));
+                        break;
+                    case DALCreateUserStatement.TLS_X509:
+                        appendable.append(k(Keywords.X509));
+                        break;
+                    case DALCreateUserStatement.TLS_CIPHER:
+                        appendable.append(k(Keywords.CIPHER), 2);
+                        print(p.getValue());
+                        break;
+                    case DALCreateUserStatement.TLS_ISSUER:
+                        appendable.append(k(Keywords.ISSUER), 2);
+                        print(p.getValue());
+                        break;
+                    case DALCreateUserStatement.TLS_SUBJECT:
+                        appendable.append(k(Keywords.SUBJECT), 2);
+                        print(p.getValue());
+                        break;
+                }
+            }
+        }
+        if (node.getResourceOptions() != null) {
+            appendable.append(t(Token.KW_WITH), 1);
+            for (Pair<Integer, Long> p : node.getResourceOptions()) {
+                appendable.append(' ');
+                switch (p.getKey()) {
+                    case DALCreateUserStatement.MAX_QUERIES_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_QUERIES_PER_HOUR), 2);
+                        break;
+                    case DALCreateUserStatement.MAX_UPDATES_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_UPDATES_PER_HOUR), 2);
+                        break;
+                    case DALCreateUserStatement.MAX_CONNECTIONS_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_CONNECTIONS_PER_HOUR), 2);
+                        break;
+                    case DALCreateUserStatement.MAX_USER_CONNECTIONS:
+                        appendable.append(k(Keywords.MAX_USER_CONNECTIONS), 2);
+                        break;
+                }
+                appendable.append(p.getValue());
+            }
+        }
+        Tuple3<Integer, Boolean, Long> option = node.getPasswordOption();
+        if (option != null) {
+            appendable.append(k(Keywords.PASSWORD), 0);
+            switch (option._1()) {
+                case DALCreateUserStatement.PASSWORD_EXPIRE:
+                    appendable.append(k(Keywords.EXPIRE), 2);
+                    if (option._2() != null) {
+                        if (option._2()) {
+                            appendable.append(t(Token.KW_DEFAULT));
+                        } else {
+                            appendable.append(k(Keywords.NEVER));
+                        }
+                    } else {
+                        appendable.append(t(Token.KW_INTERVAL), 2);
+                        print(option._3());
+                        appendable.append(k(Keywords.DAY), 1);
+                    }
+                    break;
+                case DALCreateUserStatement.PASSWORD_HISTORY:
+                    appendable.append(k(Keywords.HISTORY), 2);
+                    if (option._2() != null && option._2()) {
+                        appendable.append(t(Token.KW_DEFAULT));
+                    } else {
+                        print(option._3());
+                    }
+                    break;
+                case DALCreateUserStatement.PASSWORD_REUSE_INTERVAL:
+                    appendable.append(k(Keywords.REUSE)).append(t(Token.KW_INTERVAL), 0);
+                    if (option._2() != null && option._2()) {
+                        appendable.append(t(Token.KW_DEFAULT));
+                    } else {
+                        print(option._3());
+                        appendable.append(k(Keywords.DAY), 1);
+                    }
+                    break;
+                case DALCreateUserStatement.PASSWORD_REQUIRE_CURRENT:
+                    appendable.append(t(Token.KW_REQUIRE)).append(k(Keywords.CURRENT), 0);
+                    if (option._2() != null) {
+                        if (option._2()) {
+                            appendable.append(t(Token.KW_DEFAULT));
+                        } else {
+                            appendable.append(k(Keywords.OPTIONAL));
+                        }
+                    }
+                    break;
+            }
+        }
+        if (node.getLock() != null) {
+            if (node.getLock()) {
+                appendable.append(k(Keywords.ACCOUNT), 0).append(t(Token.KW_LOCK));
+            } else {
+                appendable.append(k(Keywords.ACCOUNT), 0).append(t(Token.KW_UNLOCK));
+            }
+        }
+    }
+
+    @Override
+    public void visit(DALSetStatement node) {
+        appendable.append(t(Token.KW_SET), 2);
+        switch (node.getType()) {
+            case DALSetStatement.SET_VARS: {
+                boolean isFst = true;
+                for (Pair<VarsPrimary, Expression> p : node.getAssignmentList()) {
+                    if (isFst) {
+                        isFst = false;
+                    } else {
+                        appendable.append(',');
+                    }
+                    print(p.getKey());
+                    appendable.append('=');
+                    print(p.getValue());
+                }
+                break;
+            }
+            case DALSetStatement.SET_CHARSET: {
+                appendable.append(k(Keywords.CHARSET), 2);
+                if (node.isDefault()) {
+                    appendable.append(t(Token.KW_DEFAULT));
+                } else {
+                    print(node.getCharset());
+                }
+                break;
+            }
+            case DALSetStatement.SET_NAMES: {
+                appendable.append(k(Keywords.NAMES), 2);
+                if (node.isDefault()) {
+                    appendable.append(t(Token.KW_DEFAULT));
+                } else {
+                    print(node.getCharset());
+                    if (node.getCollate() != null) {
+                        appendable.append(t(Token.KW_COLLATE), 0);
+                        print(node.getCollate());
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    @Override
+    public void visit(DALSetResourceGroupStatement node) {
+        appendable.append(t(Token.KW_SET)).append(k(Keywords.RESOURCE), 0).append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        List<Long> ids = node.getThreadIds();
+        if (ids != null) {
+            appendable.append(t(Token.KW_FOR), 0);
+            boolean isFst = true;
+            for (long id : ids) {
+                if (isFst) {
+                    isFst = false;
+                } else {
+                    appendable.append(',');
+                }
+                appendable.append(id);
+            }
+        }
+    }
+
+    @Override
+    public void visit(DALSetDefaultRoleStatement node) {
+        appendable.append(t(Token.KW_SET)).append(t(Token.KW_DEFAULT), 0).append(k(Keywords.ROLE), 2);
+        if (node.getNoneOrAll() != null) {
+            if (node.getNoneOrAll()) {
+                appendable.append(k(Keywords.NONE), 2);
+            } else {
+                appendable.append(t(Token.KW_ALL), 2);
+            }
+        } else {
+            printList(node.getRoles());
+            appendable.append(' ');
+        }
+        appendable.append(t(Token.KW_TO), 2);
+        printList(node.getUsers());
+    }
+
+    @Override
+    public void visit(DALSetPasswordStatement node) {
+        appendable.append(t(Token.KW_SET)).append(k(Keywords.PASSWORD), 1);
+        if (node.getUser() != null) {
+            appendable.append(t(Token.KW_FOR), 0);
+            print(node.getUser());
+        } else {
+            appendable.append('=');
+            print(node.getAuthString());
+        }
+        if (node.getCurrentAuthString() != null) {
+            appendable.append(t(Token.KW_REPLACE), 0);
+            print(node.getCurrentAuthString());
+        }
+        if (node.isRetainCurrentPassword()) {
+            appendable.append(k(Keywords.RETAIN), 0).append(k(Keywords.CURRENT)).append(k(Keywords.PASSWORD), 1);
+        }
+    }
+
+    @Override
+    public void visit(DALSetRoleStatement node) {
+        appendable.append(t(Token.KW_SET)).append(k(Keywords.ROLE), 0);
+        if (node.getDefaultOrNone() != null) {
+            if (node.getDefaultOrNone()) {
+                appendable.append(t(Token.KW_DEFAULT));
+            } else {
+                appendable.append(k(Keywords.NONE));
+            }
+        } else if (node.isAll()) {
+            appendable.append(t(Token.KW_ALL));
+            if (node.getRoles() != null) {
+                appendable.append(t(Token.KW_EXCEPT), 0);
+                printList(node.getRoles());
+            }
+        } else {
+            printList(node.getRoles());
+        }
+    }
+
+    @Override
+    public void visit(ScheduleDefinition node) {
+        if (node.getEveryInterval() != null) {
+            appendable.append(k(Keywords.EVERY), 2);
+            print(node.getEveryInterval());
+            appendable.append(' ');
+            printIntervalUnit(node.getEveryIntervalQuantity());
+            if (node.getStartsTimestamp() != null) {
+                appendable.append(k(Keywords.STARTS), 0);
+                print(node.getStartsTimestamp());
+                List<Pair<LiteralNumber, Integer>> startsIntervalList = node.getStartsIntervalList();
+                if (startsIntervalList != null && !startsIntervalList.isEmpty()) {
+                    for (Pair<LiteralNumber, Integer> integerPair : startsIntervalList) {
+                        appendable.append(' ').append('+');
+                        appendable.append(t(Token.KW_INTERVAL), 0);
+                        print(integerPair.getKey());
+                        appendable.append(' ');
+                        printIntervalUnit(integerPair.getValue());
+                    }
+                }
+            }
+            if (node.getEndsTimestamp() != null) {
+                appendable.append(k(Keywords.ENDS), 0);
+                print(node.getEndsTimestamp());
+                List<Pair<LiteralNumber, Integer>> endsIntervalList = node.getEndsIntervalList();
+                if (endsIntervalList != null && !endsIntervalList.isEmpty()) {
+                    for (Pair<LiteralNumber, Integer> integerPair : endsIntervalList) {
+                        appendable.append(' ').append('+');
+                        appendable.append(t(Token.KW_INTERVAL), 0);
+                        print(integerPair.getKey());
+                        appendable.append(' ');
+                        printIntervalUnit(integerPair.getValue());
+                    }
+                }
+            }
+        } else if (node.getAtTimestamp() != null) {
+            appendable.append(k(Keywords.AT), 2);
+            print(node.getAtTimestamp());
+            List<Pair<LiteralNumber, Integer>> intervalList = node.getIntervalList();
+            if (intervalList != null && !intervalList.isEmpty()) {
+                for (Pair<LiteralNumber, Integer> integerPair : intervalList) {
+                    appendable.append(' ').append('+');
+                    appendable.append(t(Token.KW_INTERVAL), 0);
+                    print(integerPair.getKey());
+                    appendable.append(' ');
+                    printIntervalUnit(integerPair.getValue());
+                }
+            }
+        }
+    }
+
+    @Override
+    public void visit(Characteristic node) {
+        switch (node.getType()) {
+            case Characteristic.COMMENT:
+                appendable.append(k(Keywords.COMMENT), 2);
+                print(node.getComment());
+                break;
+            case Characteristic.LANGUAGE_SQL:
+                appendable.append(k(Keywords.LANGUAGE), 2).append(t(Token.KW_SQL));
+                break;
+            case Characteristic.DETERMINISTIC:
+                appendable.append(t(Token.KW_DETERMINISTIC));
+                break;
+            case Characteristic.NOT_DETERMINISTIC:
+                appendable.append(t(Token.KW_NOT), 2).append(t(Token.KW_DETERMINISTIC));
+                break;
+            case Characteristic.CONTAINS_SQL:
+                appendable.append(k(Keywords.CONTAINS), 2).append(t(Token.KW_SQL));
+                break;
+            case Characteristic.NO_SQL:
+                appendable.append(k(Keywords.NO), 2).append(t(Token.KW_SQL));
+                break;
+            case Characteristic.READS_SQL_DATA:
+                appendable.append(t(Token.KW_READS)).append(t(Token.KW_SQL), 0).append(k(Keywords.DATA));
+                break;
+            case Characteristic.MODIFIES_SQL_DATA:
+                appendable.append(t(Token.KW_MODIFIES)).append(t(Token.KW_SQL), 0).append(k(Keywords.DATA));
+                break;
+            case Characteristic.SQL_SECURITY_DEFINER:
+                appendable.append(t(Token.KW_SQL)).append(k(Keywords.SECURITY), 0).append(k(Keywords.DEFINER));
+                break;
+            case Characteristic.SQL_SECURITY_INVOKER:
+                appendable.append(t(Token.KW_SQL)).append(k(Keywords.SECURITY), 0).append(k(Keywords.INVOKER));
+                break;
+        }
+    }
+
+    @Override
+    public void visit(IndexDefinition node) {
+        switch (node.getKeyType()) {
+            case IndexDefinition.PRIMARY: {
+                Identifier symbol = node.getSymbol();
+                if (symbol != null) {
+                    appendable.append(t(Token.KW_CONSTRAINT), 2);
+                    print(symbol);
+                    appendable.append(t(Token.KW_PRIMARY)).append(t(Token.KW_KEY), 0);
+                } else {
+                    appendable.append(' ').append(t(Token.KW_PRIMARY), 1).append(t(Token.KW_KEY), 0);
+                }
+                if (node.getIndexType() != null) {
+                    switch (node.getIndexType()) {
+                        case IndexOption.BTREE:
+                            appendable.append(k(Keywords.BTREE), 2);
+                            break;
+                        case IndexOption.HASH:
+                            appendable.append(k(Keywords.HASH), 2);
+                            break;
+                    }
+                }
+                break;
+            }
+            case IndexDefinition.UNIQUE: {
+                Identifier symbol = node.getSymbol();
+                if (symbol != null) {
+                    appendable.append(t(Token.KW_CONSTRAINT), 2);
+                    print(symbol);
+                    appendable.append(t(Token.KW_UNIQUE)).append(t(Token.KW_KEY), 0);
+                } else {
+                    appendable.append(' ').append(t(Token.KW_UNIQUE), 1).append(t(Token.KW_KEY), 0);
+                }
+                print(node.getIndexName());
+                if (node.getIndexType() != null) {
+                    switch (node.getIndexType()) {
+                        case IndexOption.BTREE:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.BTREE), 2);
+                            break;
+                        case IndexOption.HASH:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.HASH), 2);
+                            break;
+                    }
+                }
+                break;
+            }
+            case IndexDefinition.KEY: {
+                appendable.append(t(Token.KW_KEY), 2);
+                print(node.getIndexName());
+                if (node.getIndexType() != null) {
+                    switch (node.getIndexType()) {
+                        case IndexOption.BTREE:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.BTREE), 2);
+                            break;
+                        case IndexOption.HASH:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.HASH), 2);
+                            break;
+                    }
+                }
+                break;
+            }
+            case IndexDefinition.INDEX: {
+                appendable.append(t(Token.KW_INDEX), 2);
+                print(node.getIndexName());
+                if (node.getIndexType() != null) {
+                    switch (node.getIndexType()) {
+                        case IndexOption.BTREE:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.BTREE), 2);
+                            break;
+                        case IndexOption.HASH:
+                            appendable.append(t(Token.KW_USING), 0).append(k(Keywords.HASH), 2);
+                            break;
+                    }
+                }
+                break;
+            }
+            case IndexDefinition.FULLTEXT:
+                appendable.append(t(Token.KW_FULLTEXT)).append(t(Token.KW_KEY), 0);
+                print(node.getIndexName());
+                break;
+            case IndexDefinition.SPATIAL:
+                appendable.append(t(Token.KW_SPATIAL)).append(t(Token.KW_KEY), 0);
+                print(node.getIndexName());
+                break;
+        }
+        appendable.append('(');
+        List<IndexColumnName> cols = node.getColumns();
+        for (int i = 0, size = cols.size(); i < size; i++) {
+            if (i != 0) {
+                appendable.append(',');
+            }
+            print(cols.get(i));
+        }
+        appendable.append(')');
+        print(node.getOptions());
+    }
+
+    @Override
+    public void visit(IndexOption node) {
+        if (node.getKeyBlockSize() != null) {
+            appendable.append(k(Keywords.KEY_BLOCK_SIZE), 1).append('=');
+            print(node.getKeyBlockSize());
+        } else if (node.getIndexType() != null) {
+            appendable.append(t(Token.KW_USING), 1);
+            switch (node.getIndexType()) {
+                case IndexOption.BTREE:
+                    appendable.append(k(Keywords.BTREE), 1);
+                    break;
+                case IndexOption.HASH:
+                    appendable.append(k(Keywords.HASH), 1);
+                    break;
+            }
+        } else if (node.getParserName() != null) {
+            appendable.append(t(Token.KW_WITH), 1).append(k(Keywords.PARSER), 0);
+            print(node.getParserName());
+        } else if (node.getComment() != null) {
+            appendable.append(k(Keywords.COMMENT), 0);
+            print(node.getComment());
+        } else if (node.getVisible() != null) {
+            switch (node.getVisible()) {
+                case IndexOption.VISIBLE:
+                    appendable.append(k(Keywords.VISIBLE), 1);
+                    break;
+                case IndexOption.INVISIBLE:
+                    appendable.append(k(Keywords.INVISIBLE), 1);
+                    break;
+            }
+        }
+    }
+
+    @Override
+    public void visit(ForeignKeyDefinition node) {
+        Identifier symbol = node.getSymbol();
+        if (symbol != null) {
+            appendable.append(t(Token.KW_CONSTRAINT), 2);
+            print(symbol);
+            appendable.append(t(Token.KW_FOREIGN)).append(t(Token.KW_KEY), 0);
+        } else {
+            appendable.append(' ').append(t(Token.KW_FOREIGN), 1).append(t(Token.KW_KEY), 0);
+        }
+        print(node.getIndexName());
+        appendable.append('(');
+        List<Identifier> cols = node.getColumns();
+        for (int i = 0, size = cols.size(); i < size; i++) {
+            if (i != 0) {
+                appendable.append(',');
+            }
+            print(cols.get(i));
+        }
+        appendable.append(')');
+        print(node.getReferenceDefinition());
+    }
+
+    @Override
+    public void visit(TableOptions node) {
+        Expression exp = node.getAutoIncrement();
+        if (exp != null) {
+            appendable.append(k(Keywords.AUTO_INCREMENT)).append('=');
+            print(exp);
+            appendable.append(" ");
+        }
+        exp = node.getAvgRowLength();
+        if (exp != null) {
+            appendable.append(k(Keywords.AVG_ROW_LENGTH)).append('=');
+            print(exp);
+            appendable.append(" ");
+        }
+        Identifier engine = node.getEngine();
+        if (engine != null) {
+            appendable.append(k(Keywords.ENGINE)).append('=');
+            print(engine);
+            appendable.append(" ");
+        }
+        Identifier id = node.getCharset();
+        if (id != null) {
+            appendable.append(t(Token.KW_DEFAULT)).append(t(Token.KW_CHARACTER), 1).append(t(Token.KW_SET), 1)
+                .append('=');
+            print(id);
+            appendable.append(" ");
+        }
+        Integer checkSum = node.getChecksum();
+        if (checkSum != null) {
+            appendable.append(k(Keywords.CHECKSUM)).append('=').append(checkSum);
+            appendable.append(" ");
+        }
+        id = node.getCollate();
+        if (id != null) {
+            appendable.append(t(Token.KW_DEFAULT)).append(t(Token.KW_COLLATE), 1).append('=');
+            print(id);
+            appendable.append(" ");
+        }
+        LiteralString string = node.getComment();
+        if (string != null) {
+            appendable.append(k(Keywords.COMMENT)).append('=');
+            print(string);
+            appendable.append(" ");
+        }
+        LiteralString compression = node.getCompression();
+        if (compression != null) {
+            appendable.append(k(Keywords.COMPRESSION)).append('=');
+            print(compression);
+            appendable.append(" ");
+        }
+        string = node.getConnection();
+        if (string != null) {
+            appendable.append(k(Keywords.CONNECTION)).append('=');
+            print(string);
+            appendable.append(" ");
+        }
+        string = node.getDataDirectory();
+        if (string != null) {
+            appendable.append(k(Keywords.DATA), 2).append(k(Keywords.DIRECTORY)).append('=');
+            print(string);
+            appendable.append(" ");
+        }
+        string = node.getIndexDirectory();
+        if (string != null) {
+            appendable.append(t(Token.KW_INDEX), 2).append(k(Keywords.DIRECTORY)).append('=');
+            print(string);
+            appendable.append(" ");
+        }
+        Integer delayKeyWrite = node.getDelayKeyWrite();
+        if (delayKeyWrite != null) {
+            appendable.append(k(Keywords.DELAY_KEY_WRITE)).append('=').append(delayKeyWrite);
+            appendable.append(" ");
+        }
+        Boolean encryption = node.getEncryption();
+        if (encryption != null) {
+            appendable.append(k(Keywords.ENCRYPTION)).append('=').append(encryption ? "'Y'" : "'N'");
+            appendable.append(" ");
+        }
+        Integer insertMethod = node.getInsertMethod();
+        if (insertMethod != null) {
+            appendable.append(k(Keywords.INSERT_METHOD)).append('=');
+            switch (insertMethod) {
+                case TableOptions.INSERT_METHOD_FIRST:
+                    appendable.append(k(Keywords.FIRST));
+                    break;
+                case TableOptions.INSERT_METHOD_LAST:
+                    appendable.append(k(Keywords.LAST));
+                    break;
+                case TableOptions.INSERT_METHOD_NO:
+                    appendable.append(k(Keywords.NO));
+                    break;
+            }
+            appendable.append(" ");
+        }
+        exp = node.getKeyBlockSize();
+        if (exp != null) {
+            appendable.append(k(Keywords.KEY_BLOCK_SIZE)).append('=');
+            print(exp);
+            appendable.append(" ");
+        }
+        Long maxRows = node.getMaxRows();
+        if (maxRows != null) {
+            appendable.append(k(Keywords.MAX_ROWS)).append('=').append(maxRows);
+            appendable.append(" ");
+        }
+        Long minRows = node.getMinRows();
+        if (minRows != null) {
+            appendable.append(k(Keywords.MIN_ROWS)).append('=').append(minRows);
+            appendable.append(" ");
+        }
+        Integer packKeys = node.getPackKeys();
+        if (packKeys != null) {
+            appendable.append(k(Keywords.PACK_KEYS)).append('=');
+            switch (packKeys) {
+                case TableOptions._DEFAULT:
+                    appendable.append(t(Token.KW_DEFAULT));
+                    break;
+                case TableOptions._0:
+                    appendable.append(0);
+                    break;
+                case TableOptions._1:
+                    appendable.append(1);
+                    break;
+                default:
+                    break;
+            }
+            appendable.append(" ");
+        }
+        string = node.getPassword();
+        if (string != null) {
+            appendable.append(k(Keywords.PASSWORD)).append('=');
+            print(string);
+            appendable.append(" ");
+        }
+        Integer rowFormat = node.getRowFormat();
+        if (rowFormat != null) {
+            appendable.append(k(Keywords.ROW_FORMAT)).append('=');
+            switch (rowFormat) {
+                case TableOptions.ROW_FORMAT_DEFAULT:
+                    appendable.append(t(Token.KW_DEFAULT));
+                    break;
+                case TableOptions.ROW_FORMAT_DYNAMIC:
+                    appendable.append(k(Keywords.DYNAMIC));
+                    break;
+                case TableOptions.ROW_FORMAT_FIXED:
+                    appendable.append(k(Keywords.FIXED));
+                    break;
+                case TableOptions.ROW_FORMAT_COMPRESSED:
+                    appendable.append(k(Keywords.COMPRESSED));
+                    break;
+                case TableOptions.ROW_FORMAT_REDUNDANT:
+                    appendable.append(k(Keywords.REDUNDANT));
+                    break;
+                case TableOptions.ROW_FORMAT_COMPACT:
+                    appendable.append(k(Keywords.COMPACT));
+                    break;
+            }
+            appendable.append(" ");
+        }
+        Integer inte = node.getStatsAutoRecalc();
+        if (inte != null) {
+            appendable.append(k(Keywords.STATS_AUTO_RECALC)).append('=');
+            switch (inte) {
+                case TableOptions._DEFAULT:
+                    appendable.append(t(Token.KW_DEFAULT));
+                    break;
+                case TableOptions._0:
+                    appendable.append('0');
+                    break;
+                case TableOptions._1:
+                    appendable.append('1');
+                    break;
+            }
+            appendable.append(" ");
+        }
+        inte = node.getStatsPresistent();
+        if (inte != null) {
+            appendable.append(k(Keywords.STATS_PERSISTENT)).append('=');
+            switch (inte) {
+                case TableOptions._DEFAULT:
+                    appendable.append(t(Token.KW_DEFAULT));
+                    break;
+                case TableOptions._0:
+                    appendable.append('0');
+                    break;
+                case TableOptions._1:
+                    appendable.append('1');
+                    break;
+            }
+            appendable.append(" ");
+        }
+        exp = node.getStatSamplePages();
+        if (exp != null) {
+            appendable.append(k(Keywords.STATS_SAMPLE_PAGES)).append('=');
+            print(exp);
+            appendable.append(" ");
+        }
+        id = node.getTablespace();
+        if (id != null) {
+            appendable.append(k(Keywords.TABLESPACE), 2);
+            print(id);
+            inte = node.getStorage();
+            if (inte != null) {
+                appendable.append(k(Keywords.STORAGE), 0);
+                switch (inte) {
+                    case TableOptions.STORAGE_DISK:
+                        appendable.append(k(Keywords.DISK));
+                        break;
+                    case TableOptions.STORAGE_MEMORY:
+                        appendable.append(k(Keywords.MEMORY));
+                        break;
+                    // case TableOptions.STORAGE_DEFAULT:
+                    // appendable.append(t(Token.KW_DEFAULT), 1);
+                    // break;
+                }
+                appendable.append(" ");
+            }
+        }
+        List<Identifier> union = node.getUnion();
+        if (union != null && !union.isEmpty()) {
+            appendable.append(t(Token.KW_UNION)).append('=').append('(');
+            for (int i = 0, size = union.size(); i < size; i++) {
+                if (i != 0) {
+                    appendable.append(',');
+                }
+                print(union.get(i));
+            }
+            appendable.append(')');
+            appendable.append(" ");
+        }
+    }
+
+    @Override
+    public void visit(Algorithm node) {
+        appendable.append(k(Keywords.ALGORITHM)).append('=');
+        switch (node.getType()) {
+            case Algorithm.DEFAULT:
+                appendable.append(t(Token.KW_DEFAULT));
+                break;
+            case Algorithm.INSTANT:
+                appendable.append("INSTANT");
+                break;
+            case Algorithm.INPLACE:
+                appendable.append("INPLACE");
+                break;
+            case Algorithm.COPY:
+                appendable.append("COPY");
+                break;
+        }
+    }
+
+    @Override
+    public void visit(Lock node) {
+        appendable.append(t(Token.KW_LOCK)).append('=');
+        switch (node.getType()) {
+            case Lock.DEFAULT:
+                appendable.append(t(Token.KW_DEFAULT));
+                break;
+            case Lock.NONE:
+                appendable.append(k(Keywords.NONE));
+                break;
+            case Lock.SHARED:
+                appendable.append("SHARED");
+                break;
+            case Lock.EXCLUSIVE:
+                appendable.append("EXCLUSIVE");
+                break;
+        }
+    }
+
+    @Override
+    public void visit(AuthOption node) {
+        if (node.isDiscard()) {
+            appendable.append(k(Keywords.DISCARD)).append(k(Keywords.OLD), 0).append(k(Keywords.PASSWORD));
+        } else if (node.getAuthPlugin() != null) {
+            appendable.append(k(Keywords.IDENTIFIED)).append(t(Token.KW_WITH), 0);
+            print(node.getAuthPlugin());
+            if (node.getAuthString() != null) {
+                appendable.append(t(Token.KW_BY), 0);
+                print(node.getAuthString());
+                if (node.getCurrentAuthString() != null) {
+                    appendable.append(t(Token.KW_REPLACE), 0);
+                    print(node.getCurrentAuthString());
+                }
+                if (node.getRetainCurrent() != null) {
+                    appendable.append(k(Keywords.RETAIN), 1).append(k(Keywords.CURRENT), 0)
+                        .append(k(Keywords.PASSWORD));
+                }
+            } else if (node.getHashString() != null) {
+                appendable.append(t(Token.KW_AS), 0);
+                print(node.getHashString());
+            }
+        } else {
+            appendable.append(k(Keywords.IDENTIFIED)).append(t(Token.KW_BY), 0);
+            print(node.getAuthString());
+            if (node.getCurrentAuthString() != null) {
+                appendable.append(t(Token.KW_REPLACE), 0);
+                print(node.getCurrentAuthString());
+            }
+            if (node.getRetainCurrent() != null) {
+                appendable.append(k(Keywords.RETAIN), 1).append(k(Keywords.CURRENT), 0).append(k(Keywords.PASSWORD));
+            }
+        }
+    }
+
+    @Override
+    public void visit(BeginStatement node) {
+        appendable.append(k(Keywords.BEGIN));
+        if (node.isWork()) {
+            appendable.append(k(Keywords.WORK), 1);
+        }
+    }
+
+    @Override
+    public void visit(BeginEndStatement node) {
+        if (node.getBeginLabel() != null) {
+            print(node.getBeginLabel());
+            appendable.append(':');
+        }
+        appendable.append(k(Keywords.BEGIN)).append('\n');
+        List<SQLStatement> stmts = node.getStatements();
+        for (SQLStatement stmt : stmts) {
+            print(stmt);
+            appendable.isLastSemicolon();
+            appendable.append(';').append('\n');
+        }
+        appendable.append(k(Keywords.END));
+        if (node.getEndLabel() != null) {
+            appendable.append(' ');
+            print(node.getEndLabel());
+        }
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(DeclareStatement node) {
+        appendable.append(t(Token.KW_DECLARE), 2);
+        printList(node.getVarNames());
+        appendable.append(' ');
+        print(node.getDataType());
+        if (node.getDefaultVal() != null) {
+            appendable.append(t(Token.KW_DEFAULT), 0);
+            print(node.getDefaultVal());
+        }
+    }
+
+    @Override
+    public void visit(SetTransactionStatement node) {
+        appendable.append(t(Token.KW_SET));
+        if (node.isGlobal() != null) {
+            if (node.isGlobal()) {
+                appendable.append(k(Keywords.GLOBAL), 1);
+            } else {
+                appendable.append(k(Keywords.SESSION), 1);
+            }
+        }
+        appendable.append(k(Keywords.TRANSACTION), 0);
+        List<Integer> list = node.getCharacteristics();
+        boolean first = true;
+        for (Integer li : list) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            switch (li) {
+                case SetTransactionStatement.READ_UNCOMMITTED:
+                    appendable.append(k(Keywords.ISOLATION)).append(k(Keywords.LEVEL), 0);
+                    appendable.append(t(Token.KW_READ)).append(k(Keywords.UNCOMMITTED), 1);
+                    break;
+                case SetTransactionStatement.READ_COMMITTED:
+                    appendable.append(k(Keywords.ISOLATION)).append(k(Keywords.LEVEL), 0);
+                    appendable.append(t(Token.KW_READ)).append(k(Keywords.COMMITTED), 1);
+                    break;
+                case SetTransactionStatement.REPEATABLE_READ:
+                    appendable.append(k(Keywords.ISOLATION)).append(k(Keywords.LEVEL), 0);
+                    appendable.append(k(Keywords.REPEATABLE)).append(t(Token.KW_READ), 1);
+                    break;
+                case SetTransactionStatement.SERIALIZABLE:
+                    appendable.append(k(Keywords.ISOLATION)).append(k(Keywords.LEVEL), 0);
+                    appendable.append(k(Keywords.SERIALIZABLE));
+                    break;
+                case SetTransactionStatement.READ_WRITE:
+                    appendable.append(t(Token.KW_READ)).append(t(Token.KW_WRITE), 1);
+                    break;
+                case SetTransactionStatement.READ_ONLY:
+                    appendable.append(t(Token.KW_READ)).append(k(Keywords.ONLY), 1);
+                    break;
+            }
+        }
+    }
+
+    @Override
+    public void visit(CaseStatement node) {
+        appendable.append(t(Token.KW_CASE), 2);
+        print(node.getCaseValue());
+        for (Pair<Expression, SQLStatement> li : node.getWhenList()) {
+            appendable.append(t(Token.KW_WHEN), 0);
+            print(li.getKey());
+            appendable.append(t(Token.KW_THEN), 0);
+            print(li.getValue());
+            appendable.append(';');
+        }
+        if (node.getElseStmt() != null) {
+            appendable.append(t(Token.KW_ELSE), 0);
+            print(node.getElseStmt());
+            appendable.isLastSemicolon();
+            appendable.append(';');
+        }
+        appendable.append(k(Keywords.END), 0).append(t(Token.KW_CASE)).append(';');
+    }
+
+    @Override
+    public void visit(IfStatement node) {
+        appendable.append(t(Token.KW_IF), 2);
+        boolean first = true;
+        for (Pair<Expression, List<SQLStatement>> pair : node.getIfStatements()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(t(Token.KW_ELSEIF), 0);
+            }
+            print(pair.getKey());
+            appendable.append(t(Token.KW_THEN), 0);
+            for (SQLStatement stmt : pair.getValue()) {
+                print(stmt);
+                appendable.append(';');
+            }
+        }
+        if (node.getElseStatement() != null) {
+            appendable.append(t(Token.KW_ELSE), 0);
+            for (SQLStatement stmt : node.getElseStatement()) {
+                print(stmt);
+                appendable.append(';');
+            }
+        }
+        appendable.append(k(Keywords.END), 0).append(t(Token.KW_IF)).append(';');
+    }
+
+    @Override
+    public void visit(IterateStatement node) {
+        appendable.append(t(Token.KW_ITERATE), 2);
+        print(node.getLabel());
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(LeaveStatement node) {
+        appendable.append(t(Token.KW_LEAVE), 2);
+        print(node.getLabel());
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(LoopStatement node) {
+        if (node.getBeginLabel() != null) {
+            print(node.getBeginLabel());
+            appendable.append(':');
+        }
+        appendable.append(t(Token.KW_LOOP)).append('\n');
+        printList(node.getStatements(), ';');
+        appendable.append(';').append('\n');
+        appendable.append(k(Keywords.END)).append(t(Token.KW_LOOP), 1);
+        if (node.getEndLabel() != null) {
+            appendable.append(' ');
+            print(node.getEndLabel());
+        }
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(RepeatStatement node) {
+        if (node.getBeginLabel() != null) {
+            print(node.getBeginLabel());
+            appendable.append(':');
+        }
+        appendable.append(t(Token.KW_REPEAT)).append('\n');
+        printList(node.getStatements(), ';');
+        appendable.append(';').append('\n');
+        appendable.append(k(Keywords.UNTIL), 2);
+        print(node.getUtilCondition());
+        appendable.append('\n');
+        appendable.append(k(Keywords.END)).append(t(Token.KW_REPEAT), 1);
+        if (node.getEndLabel() != null) {
+            appendable.append(' ');
+            print(node.getEndLabel());
+        }
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(ReturnStatement node) {
+        appendable.append(t(Token.KW_RETURN), 2);
+        print(node.getLabel());
+        appendable.append(';');
+    }
+
+    @Override
+    public void visit(WhileStatement node) {
+        if (node.getBeginLabel() != null) {
+            print(node.getBeginLabel());
+            appendable.append(':');
+        }
+        appendable.append(t(Token.KW_WHILE), 2);
+        print(node.getWhileCondition());
+        appendable.append(k(Keywords.DO), 1);
+        appendable.append('\n');
+        printList(node.getStatements(), ';');
+        appendable.append(';').append('\n');
+        appendable.append(k(Keywords.END)).append(t(Token.KW_WHILE), 1);
+        if (node.getEndLabel() != null) {
+            appendable.append(' ');
+            print(node.getEndLabel());
+        }
+        appendable.append(';');
+    }
+
+    protected void printIntervalUnit(int interval) {
+        switch (interval) {
+            case IntervalUnit.DAY:
+                appendable.append(k(Keywords.DAY));
+                break;
+            case IntervalUnit.DAY_HOUR:
+                appendable.append(t(Token.KW_DAY_HOUR));
+                break;
+            case IntervalUnit.DAY_MICROSECOND:
+                appendable.append(t(Token.KW_DAY_MICROSECOND));
+                break;
+            case IntervalUnit.DAY_MINUTE:
+                appendable.append(t(Token.KW_DAY_MINUTE));
+                break;
+            case IntervalUnit.DAY_SECOND:
+                appendable.append(t(Token.KW_DAY_SECOND));
+                break;
+            case IntervalUnit.HOUR:
+                appendable.append(k(Keywords.HOUR));
+                break;
+            case IntervalUnit.HOUR_MICROSECOND:
+                appendable.append(t(Token.KW_HOUR_MICROSECOND));
+                break;
+            case IntervalUnit.HOUR_MINUTE:
+                appendable.append(t(Token.KW_HOUR_MINUTE));
+                break;
+            case IntervalUnit.HOUR_SECOND:
+                appendable.append(t(Token.KW_HOUR_SECOND));
+                break;
+            case IntervalUnit.MICROSECOND:
+                appendable.append(k(Keywords.MICROSECOND));
+                break;
+            case IntervalUnit.MINUTE:
+                appendable.append(k(Keywords.MINUTE));
+                break;
+            case IntervalUnit.MINUTE_MICROSECOND:
+                appendable.append(t(Token.KW_MINUTE_MICROSECOND));
+                break;
+            case IntervalUnit.MINUTE_SECOND:
+                appendable.append(t(Token.KW_MINUTE_SECOND));
+                break;
+            case IntervalUnit.MONTH:
+                appendable.append(k(Keywords.MONTH));
+                break;
+            case IntervalUnit.QUARTER:
+                appendable.append(k(Keywords.QUARTER));
+                break;
+            case IntervalUnit.SECOND:
+                appendable.append(k(Keywords.SECOND));
+                break;
+            case IntervalUnit.SECOND_MICROSECOND:
+                appendable.append(t(Token.KW_SECOND_MICROSECOND));
+                break;
+            case IntervalUnit.WEEK:
+                appendable.append(k(Keywords.WEEK));
+                break;
+            case IntervalUnit.YEAR:
+                appendable.append(k(Keywords.YEAR));
+                break;
+            case IntervalUnit.YEAR_MONTH:
+                appendable.append(t(Token.KW_YEAR_MONTH));
+                break;
+        }
+    }
+
+    @Override
+    public void visit(ConditionValue node) {
+        switch (node.getType()) {
+            case ConditionValue.SQLSTATE:
+                appendable.append(t(Token.KW_SQLSTATE), 2);
+                print(node.getValue());
+                break;
+            case ConditionValue.MYSQL_ERROR_CODE:
+            case ConditionValue.CONDITION_NAME:
+                print(node.getValue());
+                break;
+            case ConditionValue.SQLWARNING:
+                appendable.append(t(Token.KW_SQLWARNING));
+                break;
+            case ConditionValue.NOT_FOUND:
+                appendable.append(t(Token.KW_NOT)).append(k(Keywords.FOUND), 1);
+                break;
+            case ConditionValue.SQLEXCEPTION:
+                appendable.append(t(Token.KW_SQLEXCEPTION));
+                break;
+        }
+    }
+
+    @Override
+    public void visit(DeclareConditionStatement node) {
+        appendable.append(t(Token.KW_DECLARE), 2);
+        print(node.getName());
+        appendable.append(t(Token.KW_CONDITION), 0);
+        appendable.append(t(Token.KW_FOR), 2);
+        print(node.getValue());
+    }
+
+    @Override
+    public void visit(DeclareHandlerStatement node) {
+        appendable.append(t(Token.KW_DECLARE), 2);
+        switch (node.getAction()) {
+            case DeclareHandlerStatement.CONTINUE:
+                appendable.append(t(Token.KW_CONTINUE), 2);
+                break;
+            case DeclareHandlerStatement.EXIT:
+                appendable.append(t(Token.KW_EXIT), 2);
+                break;
+            case DeclareHandlerStatement.UNDO:
+                appendable.append(t(Token.KW_UNDO), 2);
+                break;
+        }
+        appendable.append(k(Keywords.HANDLER)).append(t(Token.KW_FOR), 0);
+        printList(node.getConditionValues());
+        appendable.append('\n');
+        print(node.getStmt());
+    }
+
+    @Override
+    public void visit(GetDiagnosticsStatement node) {
+        appendable.append(t(Token.KW_GET));
+        if (node.getIsCurrentOrStacked() != null) {
+            if (node.getIsCurrentOrStacked()) {
+                appendable.append(k(Keywords.CURRENT), 1);
+            } else {
+                appendable.append(k(Keywords.STACKED), 1);
+            }
+        }
+        appendable.append(k(Keywords.DIAGNOSTICS), 0);
+        List<Pair<Expression, Integer>> list = node.getStatementItems();
+        if (list != null && !list.isEmpty()) {
+            boolean first = true;
+            for (Pair<Expression, Integer> li : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(li.getKey());
+                appendable.append('=');
+                switch (li.getValue()) {
+                    case GetDiagnosticsStatement.NUMBER:
+                        appendable.append(k(Keywords.NUMBER));
+                        break;
+                    case GetDiagnosticsStatement.ROW_COUNT:
+                        appendable.append(k(Keywords.ROW_COUNT));
+                        break;
+                }
+            }
+        }
+        if (node.getConditionNumber() != null) {
+            appendable.append(t(Token.KW_CONDITION), 2);
+            print(node.getConditionNumber());
+            appendable.append(' ');
+        }
+        list = node.getConditionItems();
+        if (list != null && !list.isEmpty()) {
+            boolean first = true;
+            for (Pair<Expression, Integer> li : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(li.getKey());
+                appendable.append('=');
+                printConditionInfoItem(li.getValue());
+            }
+        }
+    }
+
+    private void printConditionInfoItem(Integer value) {
+        switch (value) {
+            case GetDiagnosticsStatement.COND_CLASS_ORIGIN:
+                appendable.append(k(Keywords.CLASS_ORIGIN));
+                break;
+            case GetDiagnosticsStatement.COND_SUBCLASS_ORIGIN:
+                appendable.append(k(Keywords.SUBCLASS_ORIGIN));
+                break;
+            case GetDiagnosticsStatement.COND_RETURNED_SQLSTATE:
+                appendable.append(k(Keywords.RETURNED_SQLSTATE));
+                break;
+            case GetDiagnosticsStatement.COND_MESSAGE_TEXT:
+                appendable.append(k(Keywords.MESSAGE_TEXT));
+                break;
+            case GetDiagnosticsStatement.COND_MYSQL_ERRNO:
+                appendable.append(k(Keywords.MYSQL_ERRNO));
+                break;
+            case GetDiagnosticsStatement.COND_CONSTRAINT_CATALOG:
+                appendable.append(k(Keywords.CONSTRAINT_CATALOG));
+                break;
+            case GetDiagnosticsStatement.COND_CONSTRAINT_SCHEMA:
+                appendable.append(k(Keywords.CONSTRAINT_SCHEMA));
+                break;
+            case GetDiagnosticsStatement.COND_CONSTRAINT_NAME:
+                appendable.append(k(Keywords.CONSTRAINT_NAME));
+                break;
+            case GetDiagnosticsStatement.COND_CATALOG_NAME:
+                appendable.append(k(Keywords.CATALOG_NAME));
+                break;
+            case GetDiagnosticsStatement.COND_SCHEMA_NAME:
+                appendable.append(k(Keywords.SCHEMA_NAME));
+                break;
+            case GetDiagnosticsStatement.COND_TABLE_NAME:
+                appendable.append(k(Keywords.TABLE_NAME));
+                break;
+            case GetDiagnosticsStatement.COND_COLUMN_NAME:
+                appendable.append(k(Keywords.COLUMN_NAME));
+                break;
+            case GetDiagnosticsStatement.COND_CURSOR_NAME:
+                appendable.append(k(Keywords.CURSOR_NAME));
+                break;
+        }
+    }
+
+    @Override
+    public void visit(ResignalStatement node) {
+        appendable.append(t(Token.KW_RESIGNAL));
+        if (node.getConditionValue() != null) {
+            appendable.append(' ');
+            print(node.getConditionValue());
+        }
+        List<Pair<Integer, Literal>> list = node.getInformationItems();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(t(Token.KW_SET), 0);
+            boolean first = true;
+            for (Pair<Integer, Literal> li : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                printConditionInfoItem(li.getKey());
+                appendable.append('=');
+                print(li.getValue());
+            }
+        }
+    }
+
+    @Override
+    public void visit(SignalStatement node) {
+        appendable.append(t(Token.KW_SIGNAL));
+        if (node.getConditionValue() != null) {
+            appendable.append(' ');
+            print(node.getConditionValue());
+        }
+        List<Pair<Integer, Literal>> list = node.getInformationItems();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(t(Token.KW_SET), 0);
+            boolean first = true;
+            for (Pair<Integer, Literal> li : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                printConditionInfoItem(li.getKey());
+                appendable.append('=');
+                print(li.getValue());
+            }
+        }
+    }
+
+    @Override
+    public void visit(CursorCloseStatement node) {
+        appendable.append(k(Keywords.CLOSE), 2);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(CursorDeclareStatement node) {
+        appendable.append(t(Token.KW_DECLARE), 2);
+        print(node.getName());
+        appendable.append(t(Token.KW_CURSOR), 0).append(t(Token.KW_FOR), 2);
+        print(node.getStmt());
+    }
+
+    @Override
+    public void visit(CursorFetchStatement node) {
+        appendable.append(t(Token.KW_FETCH), 2);
+        print(node.getName());
+        appendable.append(t(Token.KW_INTO), 0);
+        printList(node.getVarNames());
+    }
+
+    @Override
+    public void visit(CursorOpenStatement node) {
+        appendable.append(k(Keywords.OPEN), 2);
+        print(node.getName());
+    }
+
 }
 

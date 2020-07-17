@@ -6,13 +6,13 @@
 [![GitHub stars](https://img.shields.io/github/stars/Dagon0577/DagonParser.svg)](https://github.com/Dagon0577/DagonParser/stargazers)
 [![GitHub license](https://img.shields.io/github/license/Dagon0577/DagonParser.svg)](https://github.com/Dagon0577/DagonParser/blob/master/LICENSE)
 
-MySQL high-performance parser, use byte stream parsing.
+MySQL高性能解析器，采用byte流解析。
 
-Lexical analysis and grammatical analysis refer to MySQL 8.0
+词法分析和语法分析参考MySQL 8.0
 
-# Parser
+# 解析
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 
-# reference
+# 参考
 [cobar](https://github.com/alibaba/cobar)
 [Timo-parser](https://github.com/Dagon0577/Timo-parser/blob/master/README.md)

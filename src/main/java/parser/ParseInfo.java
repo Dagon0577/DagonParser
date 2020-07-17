@@ -15,8 +15,6 @@ public class ParseInfo {
     public static final long JOIN = 1L << index++; // JOIN
     public static final long HINT = 1L << index++; // HINT
     public static final long WILDCARD_IN_SELECT = 1L << index++; // SELECT字段中含有通配符*
-    public static final long DNID_IN_SELECT = 1L << index++; // SELECT字段中含有DNID
-    public static final long DNID_IN_WHERE = 1L << index++; // WHERE条件中含有DNID
     public static final long OR_CONDITION = 1L << index++; // WHERE 条件中含有OR
     public static final long XOR_CONDITION = 1L << index++; // WHERE 条件中含有XOR
     public static final long UNCERTAINTY_FUNCTION = 1L << index++; // 含有非确定性函数
@@ -51,14 +49,6 @@ public class ParseInfo {
 
     public static final boolean isWildCardInSelect(long info) {
         return (info & WILDCARD_IN_SELECT) == WILDCARD_IN_SELECT;
-    }
-
-    public static final boolean isDNIDInSelect(long info) {
-        return (info & DNID_IN_SELECT) == DNID_IN_SELECT;
-    }
-
-    public static final boolean isDNIDInWhere(long info) {
-        return (info & DNID_IN_WHERE) == DNID_IN_WHERE;
     }
 
     public static final boolean hasOrCondition(long info) {
@@ -98,8 +88,6 @@ public class ParseInfo {
         sb.append("isJoin").append(":").append(isJoin(info)).append(", ");
         sb.append("isHint").append(":").append(isHint(info)).append(", ");
         sb.append("isWildcardInSelect").append(":").append(isWildCardInSelect(info)).append(", ");
-        sb.append("isDNIDInSelect").append(":").append(isDNIDInSelect(info)).append(", ");
-        sb.append("isDNIDInWhere").append(":").append(isDNIDInWhere(info)).append(", ");
         sb.append("hasOrCondition").append(":").append(hasOrCondition(info)).append(", ");
         sb.append("hasXorCondition").append(":").append(hasXorCondition(info)).append(", ");
         sb.append("hasUncertaintyFunction").append(":").append(hasUncertaintyFunction(info)).append(", ");
@@ -110,49 +98,4 @@ public class ParseInfo {
         sb.append("]");
         return sb.toString();
     }
-
-    //    public static boolean isQuickSelect(long info, DMLSelectStatement select) {
-    //        return (isSingleTable(info) || isNoTable(info)) && !idWithSchema(info) && !idWithTable(info) && !isUnion(info)
-    //            && !isSubquery(info) && !isJoin(info) && !isHint(info) && !isDNIDInSelect(info) && !isDNIDInWhere(info)
-    //            && !hasOrCondition(info) && !hasXorCondition(info) && !hasUncertaintyFunction(info) && !hasAggregation(info)
-    //            && !hasVarAssignment(info) && select.getHaving() == null && select.getLimit() == null
-    //            && select.getLock() == null && select.getOutFile() == null && select.getWindows() == null
-    //            && select.getWithClause() == null;
-    //    }
-    //
-    //    //单表聚合查询，无HINT，DNID，OR，XOR，Lock，File，Having，WithRollup等特殊处理
-    //    public static boolean isSimpleSingleTableSelect(long info, DMLSelectStatement select) {
-    //        return isSingleTable(info) && !idWithSchema(info) && !isUnion(info) && !isSubquery(info) && !isJoin(info)
-    //            && !isHint(info) && !isDNIDInSelect(info) && !isDNIDInWhere(info) && !hasOrCondition(info)
-    //            && !hasXorCondition(info) && !hasUncertaintyFunction(info) && !hasVarAssignment(info)
-    //            && select.getHaving() == null && select.getLock() == null && select.getOutFile() == null
-    //            && select.getWindows() == null && select.getWithClause() == null && (select.getGroupBy() == null || !select
-    //            .getGroupBy().isWithRollup());
-    //    }
-    //
-    //    //可以尝试路由到单节点的语句
-    //    public static boolean isSimpleSingleNodeSelect(long info, DMLSelectStatement select) {
-    //        return isSingleTable(info) && !idWithSchema(info) && !isUnion(info) && !isSubquery(info) && !isJoin(info)
-    //            && !isHint(info) && !isDNIDInSelect(info) && !isDNIDInWhere(info) && !hasOrCondition(info)
-    //            && !hasXorCondition(info) && !hasUncertaintyFunction(info) && !hasVarAssignment(info)
-    //            && select.getLock() == null && select.getOutFile() == null && select.getWindows() == null
-    //            && select.getWithClause() == null;
-    //    }
-    //
-    //    public static boolean isQuickInsert(long info, DMLInsertReplaceStatement insert) {
-    //        return isSingleTable(info) && !idWithSchema(info) && !isSubquery(info) && !isHint(info) && !isDNIDInSelect(info)
-    //            && !isDNIDInWhere(info) && !hasUncertaintyFunction(info) && insert.getSelect() == null;
-    //    }
-    //
-    //    public static boolean isQuickUpdate(long info, DMLUpdateStatement update) {
-    //        return isSingleTable(info) && !idWithSchema(info) && !isSubquery(info) && !isHint(info) && !isDNIDInSelect(info)
-    //            && !isDNIDInWhere(info) && !hasOrCondition(info) && !hasXorCondition(info) && !hasUncertaintyFunction(info)
-    //            && update.getLimit() == null;
-    //    }
-    //
-    //    public static boolean isQuickDelete(long info, DMLDeleteStatement delete) {
-    //        return isSingleTable(info) && !idWithSchema(info) && !isSubquery(info) && !isHint(info) && !isDNIDInSelect(info)
-    //            && !isDNIDInWhere(info) && !hasOrCondition(info) && !hasXorCondition(info) && !hasUncertaintyFunction(info)
-    //            && delete.getLimit() == null;
-    //    }
 }
