@@ -12,6 +12,7 @@ public class AbstractSyntaxTest extends TestCase {
 
     protected String outputMySQL(AST node, byte[] sql) {
         OutputVisitor ov = new OutputVisitor(sql);
+        //遍历
         node.accept(ov);
         String sb = new String(ov.getData());
         if (debug) {
