@@ -79,6 +79,13 @@ public class MySQLDMLSelectParserTest extends AbstractSyntaxTest {
             "SELECT * FROM offer AS a STRAIGHT_JOIN wp_image AS b USE KEY FOR JOIN(t1,t2) ON a.member_id=b.member_id INNER JOIN product_visit AS c WHERE a.member_id=c.member_id AND c.member_id='abc'",
             output);
 
+        sql = "select where".getBytes();
+        tuple = Parser.parse(sql, MySqlCharset.UTF8_FOR_JAVA);
+        assertNotNull(tuple);
+        assertNotNull(tuple._1());
+        assertNotNull(tuple._2());
+        assertEquals("unrecognized token as first token of primary: KW_WHERE", tuple._2().getMessage());
+
         sql = "SELect all tb1.id,tb2.id from tb1,tb2 where tb1.id2=tb2.id2".getBytes();
         tuple = Parser.parse(sql, MySqlCharset.UTF8_FOR_JAVA);
         assertNotNull(tuple);

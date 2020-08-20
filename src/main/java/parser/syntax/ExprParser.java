@@ -872,11 +872,17 @@ public class ExprParser extends AbstractParser {
                 lexer.nextToken();
                 return new Wildcard(null);
             }
-            case Token.IDENTIFIER:
-            default: {
+            case Token.KW_DENSE_RANK:
+            case Token.KW_RANK:
+            case Token.KW_ROW_NUMBER:
+            case Token.IDENTIFIER: {
                 long info = lexer.tokenInfo();
                 lexer.nextToken();
                 return startedFromIdentifier(info);
+            }
+            default: {
+                throw new SQLSyntaxErrorException(
+                    "unrecognized token as first token of primary: " + Token.getInfo(lexer.token()));
             }
         }
     }
