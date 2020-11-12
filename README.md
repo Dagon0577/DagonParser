@@ -19,4 +19,3 @@ Lexical analysis and grammatical analysis refer to MySQL 8.0
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
-[Timo-parser](https://github.com/Dagon0577/Timo-parser/blob/master/README.md)
