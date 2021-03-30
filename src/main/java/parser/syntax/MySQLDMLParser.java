@@ -37,6 +37,7 @@ public class MySQLDMLParser extends AbstractParser {
         this.exprParser = exprParser;
     }
 
+    // parser
     public DMLSelectStatement select() throws SQLSyntaxErrorException {
         MySQLDMLSelectParser parser = new MySQLDMLSelectParser(lexer, exprParser);
         return parser.select();
@@ -328,6 +329,110 @@ public class MySQLDMLParser extends AbstractParser {
         return new DMLDeleteStatement(lowPriority, quick, ignore, tempList, tempRefs);
     }
 
+    public DMLInsertReplaceStatement replace() throws SQLSyntaxErrorException {
+        match(Token.KW_REPLACE);
+        int mode = DMLInsertReplaceStatement.UNDEF;
+        switch (lexer.token()) {
+            case Token.KW_LOW_PRIORITY:
+                lexer.nextToken();
+                mode = DMLInsertReplaceStatement.LOW;
+                break;
+            case Token.KW_DELAYED:
+                lexer.nextToken();
+                mode = DMLInsertReplaceStatement.DELAY;
+                break;
+        }
+        if (lexer.token() == Token.KW_INTO) {
+            lexer.nextToken();
+        }
+        Identifier table = identifier(true);
+        List<Identifier> columnNameList;
+        List<RowExpression> rowList;
+        QueryExpression select = null;
+        List<Identifier> partition = null;
+        if (lexer.token() == Token.KW_PARTITION) {
+            partition = new ArrayList<>();
+            lexer.nextToken();
+            match(Token.PUNC_LEFT_PAREN);
+            partition.add(identifier());
+            while (lexer.token() != Token.EOF) {
+                if (lexer.token() == Token.PUNC_COMMA) {
+                    lexer.nextToken();
+                    partition.add(identifier());
+                    continue;
+                }
+                break;
+            }
+            match(Token.PUNC_RIGHT_PAREN);
+        }
+        List<Expression> tempRowValue;
+        switch (lexer.token()) {
+            case Token.KW_SET:
+                lexer.nextToken();
+                columnNameList = new LinkedList<Identifier>();
+                tempRowValue = new LinkedList<Expression>();
+                for (;; lexer.nextToken()) {
+                    Identifier id = identifier();
+                    match(Token.OP_EQUALS, Token.OP_ASSIGN);
+                    Expression expr = exprParser.expression();
+                    columnNameList.add(id);
+                    tempRowValue.add(expr);
+                    if (lexer.token() != Token.PUNC_COMMA) {
+                        break;
+                    }
+                }
+                rowList = new ArrayList<RowExpression>(1);
+                rowList.add(new RowExpression(tempRowValue));
+                return new DMLInsertReplaceStatement(false, mode, false, table, columnNameList,
+                    rowList, null, null, partition);
+            case Token.IDENTIFIER:
+                if (!equalsKeyword(Keywords.VALUE)) {
+                    break;
+                }
+            case Token.KW_VALUES:
+                lexer.nextToken();
+                columnNameList = null;
+                rowList = rowList();
+                return new DMLInsertReplaceStatement(false, mode, false, table, columnNameList,
+                    rowList, null, null, partition);
+            case Token.KW_SELECT:
+                columnNameList = null;
+                select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                return new DMLInsertReplaceStatement(false, mode, false, table, columnNameList,
+                    null, select, null, partition);
+            case Token.PUNC_LEFT_PAREN:
+                switch (lexer.nextToken()) {
+                    case Token.PUNC_LEFT_PAREN:
+                    case Token.KW_SELECT:
+                        columnNameList = null;
+                        select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                        match(Token.PUNC_RIGHT_PAREN);
+                        return new DMLInsertReplaceStatement(false, mode, false, table,
+                            columnNameList, null, select, null, partition);
+                }
+                columnNameList = idList(false);
+                match(Token.PUNC_RIGHT_PAREN);
+                switch (lexer.token()) {
+                    case Token.PUNC_LEFT_PAREN:
+                    case Token.KW_SELECT:
+                        select = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
+                        return new DMLInsertReplaceStatement(false, mode, false, table,
+                            columnNameList, null, select, null, partition);
+                    case Token.KW_VALUES:
+                        lexer.nextToken();
+                        break;
+                    default:
+                        matchKeywords(Keywords.VALUE);
+                }
+                rowList = rowList();
+                return new DMLInsertReplaceStatement(false, mode, false, table, columnNameList,
+                    rowList, null, null, partition);
+        }
+        throw new SQLSyntaxErrorException("unexpected token for replace: " + lexer.token());
+    }
+
+    // protected
+
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {
         switch (lexer.token()) {
             case Token.KW_SELECT:
@@ -539,6 +644,192 @@ public class MySQLDMLParser extends AbstractParser {
         return groupBy;
     }
 
+    protected DMLQueryStatement buildUnionSelect(DMLSelectStatement select, boolean isSubQuery)
+        throws SQLSyntaxErrorException {
+        if (lexer.token() != Token.KW_UNION) {
+            if (isSubQuery) {
+                select.setInParentheses(true);
+            }
+            return select;
+        }
+        lexer.addParseInfo(ParseInfo.UNION);
+        boolean hasParenByFirst = select.isInParentheses();
+        if (select.getOrderBy() != null && !hasParenByFirst) {
+            throw new SQLSyntaxErrorException("Incorrect usage of UNION and ORDER BY");
+        }
+        boolean existOrderOrLimit = false;
+        DMLSelectUnionStatement union = new DMLSelectUnionStatement(select);
+        for (; lexer.token() == Token.KW_UNION; ) {
+            lexer.nextToken();
+            boolean isAll = false;
+            switch (lexer.token()) {
+                case Token.KW_ALL:
+                    isAll = true;
+                case Token.KW_DISTINCT:
+                    lexer.nextToken();
+                    break;
+            }
+            select = selectPrimary();
+            if (hasParenByFirst && !select.isInParentheses()) { // 第一个有括号 后续没括号则抛该错
+                throw new SQLSyntaxErrorException("unexpected token " + lexer.token());
+            }
+            if (existOrderOrLimit) {
+                throw new SQLSyntaxErrorException("Incorrect usage of UNION and ORDER BY");
+            }
+            if ((select.getOrderBy() != null || select.getLimit() != null) && !select
+                .isInParentheses()) {// 允许最后一个order by不在括号中
+                if (!existOrderOrLimit) {
+                    existOrderOrLimit = true;
+                }
+            }
+            if ((select.getOuterOrderBy() != null || select.getOuterLimit() != null) && select.isInParentheses()) {
+                if (!existOrderOrLimit) {
+                    existOrderOrLimit = true;
+                }
+            }
+            union.addSelect(select, isAll);
+        }
+        if (existOrderOrLimit) {
+            int index = union.getSelects().size() - 1;
+            DMLSelectStatement last = union.getSelects().get(index);
+            if (last.isInParentheses()) {
+                union.setOrderBy(last.getOuterOrderBy());
+                union.setLimit(last.getOuterLimit());
+                DMLSelectStatement newStmt =
+                    new DMLSelectStatement(last.getOption(), last.getSelectExprList(), last.getTables(),
+                        last.getWhere(), last.getGroupBy(), last.getHaving(), last.getWindows(), last.getOrderBy(),
+                        last.getLimit(), last.getOutFile(), last.getLock());
+                newStmt.setInParentheses(true);
+                union.getSelects().set(index, newStmt);
+            } else {
+                union.setOrderBy(last.getOrderBy());
+                union.setLimit(last.getLimit());
+                DMLSelectStatement newStmt =
+                    new DMLSelectStatement(last.getOption(), last.getSelectExprList(), last.getTables(),
+                        last.getWhere(), last.getGroupBy(), last.getHaving(), last.getWindows(), null, null,
+                        last.getOutFile(), last.getLock());
+                newStmt.setInParentheses(false);
+                union.getSelects().set(index, newStmt);
+            }
+        } else {
+            if (lexer.token() == Token.KW_ORDER) {
+                union.setOrderBy(orderBy());
+            }
+            if (lexer.token() == Token.KW_LIMIT) {
+                union.setLimit(limit(false));
+            }
+        }
+        return union;
+    }
+
+    protected Tables tableRefs() throws SQLSyntaxErrorException {
+        Tables tables = buildTableReferences(tableReference());
+        if (tables.isSingleTable()) {
+            lexer.addParseInfo(ParseInfo.SINGLE_TABLE);
+        }
+        return tables;
+    }
+
+    protected String alias() throws SQLSyntaxErrorException {
+        if (lexer.token() == Token.KW_AS) {
+            lexer.nextToken();
+        }
+        if (lexer.token() == Token.LITERAL_CHARS) {
+            long info = lexer.tokenInfo();
+            lexer.nextToken();
+            return lexer.stringValue(info);
+        } else if (lexer.token() == Token.IDENTIFIER) {
+            int start = lexer.getOffset();
+            int size = lexer.getSize();
+            byte firstByte = lexer.getSQL()[start];
+            lexer.nextToken();
+            if (lexer.token() == Token.LITERAL_CHARS && firstByte == '_') {
+                size += lexer.getSize();
+                lexer.nextToken();
+            }
+            return lexer.stringValue(((long)start << 32) | ((((long)size << 32) >> 32)));
+        }
+        return null;
+    }
+
+    protected String as() throws SQLSyntaxErrorException {
+        if (lexer.token() == Token.KW_AS) {
+            lexer.nextToken();
+        }
+        if (lexer.token() == Token.IDENTIFIER) {
+            String alia = lexer.stringValue();
+            lexer.nextToken();
+            if (lexer.token() == Token.LITERAL_CHARS && alia.charAt(0) == '_') {
+                StringBuilder alias = new StringBuilder();
+                alias.append(alia);
+                alias.append(lexer.stringValue());
+                lexer.nextToken();
+                return alias.toString();
+            }
+            return alia;
+        } else if (lexer.token() == Token.LITERAL_CHARS) {
+            String alia = lexer.stringValue();
+            lexer.nextToken();
+            return alia;
+        }
+        return null;
+    }
+
+    protected List<Identifier> idList(boolean isTable) throws SQLSyntaxErrorException {
+        return buildIdList(identifier(isTable), isTable);
+    }
+
+    protected List<Identifier> buildIdList(Identifier id, boolean isTable) throws SQLSyntaxErrorException {
+        if (lexer.token() != Token.PUNC_COMMA) {
+            List<Identifier> list = new ArrayList<Identifier>(1);
+            list.add(id);
+            return list;
+        }
+        List<Identifier> list = new LinkedList<Identifier>();
+        list.add(id);
+        for (; lexer.token() == Token.PUNC_COMMA; ) {
+            lexer.nextToken();
+            id = identifier(isTable);
+            list.add(id);
+        }
+        return list;
+    }
+
+    protected List<Identifier> idNameList() throws SQLSyntaxErrorException {
+        List<Identifier> list = new ArrayList<Identifier>();
+        if (lexer.token() == Token.PUNC_RIGHT_PAREN) {
+            lexer.nextToken();
+            return list;
+        }
+        list.add(identifier());
+        if (lexer.token() == Token.PUNC_COMMA) {
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                list.add(identifier());
+            }
+        }
+        match(Token.PUNC_RIGHT_PAREN);
+        return list;
+    }
+
+    protected List<RowExpression> rowList() throws SQLSyntaxErrorException {
+        List<RowExpression> valuesList;
+        List<Expression> tempRowValue = rowValue();
+        if (lexer.token() == Token.PUNC_COMMA) {
+            valuesList = new LinkedList<RowExpression>();
+            valuesList.add(new RowExpression(tempRowValue));
+            for (; lexer.token() == Token.PUNC_COMMA; ) {
+                lexer.nextToken();
+                tempRowValue = rowValue();
+                valuesList.add(new RowExpression(tempRowValue));
+            }
+        } else {
+            valuesList = new ArrayList<RowExpression>(1);
+            valuesList.add(new RowExpression(tempRowValue));
+        }
+        return valuesList;
+    }
+
     private WithClause withClause() throws SQLSyntaxErrorException {
         match(Token.KW_WITH);
         boolean isRecursive = false;
@@ -557,6 +848,7 @@ public class MySQLDMLParser extends AbstractParser {
         return new WithClause(isRecursive, ctes);
     }
 
+    // private
     private CTE parseCET() throws SQLSyntaxErrorException {
         CTE cte = new CTE();
         cte.name = identifier();
@@ -578,14 +870,6 @@ public class MySQLDMLParser extends AbstractParser {
         cte.subquery.setInParentheses(true);
         match(Token.PUNC_RIGHT_PAREN);
         return cte;
-    }
-
-    protected Tables tableRefs() throws SQLSyntaxErrorException {
-        Tables tables = buildTableReferences(tableReference());
-        if (tables.isSingleTable()) {
-            lexer.addParseInfo(ParseInfo.SINGLE_TABLE);
-        }
-        return tables;
     }
 
     private Tables buildTableReferences(TableReference ref) throws SQLSyntaxErrorException {
@@ -956,184 +1240,6 @@ public class MySQLDMLParser extends AbstractParser {
         }
         match(Token.PUNC_RIGHT_PAREN);
         return row;
-    }
-
-    protected DMLQueryStatement buildUnionSelect(DMLSelectStatement select, boolean isSubQuery)
-        throws SQLSyntaxErrorException {
-        if (lexer.token() != Token.KW_UNION) {
-            if (isSubQuery) {
-                select.setInParentheses(true);
-            }
-            return select;
-        }
-        lexer.addParseInfo(ParseInfo.UNION);
-        boolean hasParenByFirst = select.isInParentheses();
-        if (select.getOrderBy() != null && !hasParenByFirst) {
-            throw new SQLSyntaxErrorException("Incorrect usage of UNION and ORDER BY");
-        }
-        boolean existOrderOrLimit = false;
-        DMLSelectUnionStatement union = new DMLSelectUnionStatement(select);
-        for (; lexer.token() == Token.KW_UNION; ) {
-            lexer.nextToken();
-            boolean isAll = false;
-            switch (lexer.token()) {
-                case Token.KW_ALL:
-                    isAll = true;
-                case Token.KW_DISTINCT:
-                    lexer.nextToken();
-                    break;
-            }
-            select = selectPrimary();
-            if (hasParenByFirst && !select.isInParentheses()) { // 第一个有括号 后续没括号则抛该错
-                throw new SQLSyntaxErrorException("unexpected token " + lexer.token());
-            }
-            if (existOrderOrLimit) {
-                throw new SQLSyntaxErrorException("Incorrect usage of UNION and ORDER BY");
-            }
-            if ((select.getOrderBy() != null || select.getLimit() != null) && !select
-                .isInParentheses()) {// 允许最后一个order by不在括号中
-                if (!existOrderOrLimit) {
-                    existOrderOrLimit = true;
-                }
-            }
-            if ((select.getOuterOrderBy() != null || select.getOuterLimit() != null) && select.isInParentheses()) {
-                if (!existOrderOrLimit) {
-                    existOrderOrLimit = true;
-                }
-            }
-            union.addSelect(select, isAll);
-        }
-        if (existOrderOrLimit) {
-            int index = union.getSelects().size() - 1;
-            DMLSelectStatement last = union.getSelects().get(index);
-            if (last.isInParentheses()) {
-                union.setOrderBy(last.getOuterOrderBy());
-                union.setLimit(last.getOuterLimit());
-                DMLSelectStatement newStmt =
-                    new DMLSelectStatement(last.getOption(), last.getSelectExprList(), last.getTables(),
-                        last.getWhere(), last.getGroupBy(), last.getHaving(), last.getWindows(), last.getOrderBy(),
-                        last.getLimit(), last.getOutFile(), last.getLock());
-                newStmt.setInParentheses(true);
-                union.getSelects().set(index, newStmt);
-            } else {
-                union.setOrderBy(last.getOrderBy());
-                union.setLimit(last.getLimit());
-                DMLSelectStatement newStmt =
-                    new DMLSelectStatement(last.getOption(), last.getSelectExprList(), last.getTables(),
-                        last.getWhere(), last.getGroupBy(), last.getHaving(), last.getWindows(), null, null,
-                        last.getOutFile(), last.getLock());
-                newStmt.setInParentheses(false);
-                union.getSelects().set(index, newStmt);
-            }
-        } else {
-            if (lexer.token() == Token.KW_ORDER) {
-                union.setOrderBy(orderBy());
-            }
-            if (lexer.token() == Token.KW_LIMIT) {
-                union.setLimit(limit(false));
-            }
-        }
-        return union;
-    }
-
-    protected String alias() throws SQLSyntaxErrorException {
-        if (lexer.token() == Token.KW_AS) {
-            lexer.nextToken();
-        }
-        if (lexer.token() == Token.LITERAL_CHARS) {
-            long info = lexer.tokenInfo();
-            lexer.nextToken();
-            return lexer.stringValue(info);
-        } else if (lexer.token() == Token.IDENTIFIER) {
-            int start = lexer.getOffset();
-            int size = lexer.getSize();
-            byte firstByte = lexer.getSQL()[start];
-            lexer.nextToken();
-            if (lexer.token() == Token.LITERAL_CHARS && firstByte == '_') {
-                size += lexer.getSize();
-                lexer.nextToken();
-            }
-            return lexer.stringValue(((long)start << 32) | ((((long)size << 32) >> 32)));
-        }
-        return null;
-    }
-
-    protected String as() throws SQLSyntaxErrorException {
-        if (lexer.token() == Token.KW_AS) {
-            lexer.nextToken();
-        }
-        if (lexer.token() == Token.IDENTIFIER) {
-            String alia = lexer.stringValue();
-            lexer.nextToken();
-            if (lexer.token() == Token.LITERAL_CHARS && alia.charAt(0) == '_') {
-                StringBuilder alias = new StringBuilder();
-                alias.append(alia);
-                alias.append(lexer.stringValue());
-                lexer.nextToken();
-                return alias.toString();
-            }
-            return alia;
-        } else if (lexer.token() == Token.LITERAL_CHARS) {
-            String alia = lexer.stringValue();
-            lexer.nextToken();
-            return alia;
-        }
-        return null;
-    }
-
-    protected List<Identifier> idList(boolean isTable) throws SQLSyntaxErrorException {
-        return buildIdList(identifier(isTable), isTable);
-    }
-
-    protected List<Identifier> buildIdList(Identifier id, boolean isTable) throws SQLSyntaxErrorException {
-        if (lexer.token() != Token.PUNC_COMMA) {
-            List<Identifier> list = new ArrayList<Identifier>(1);
-            list.add(id);
-            return list;
-        }
-        List<Identifier> list = new LinkedList<Identifier>();
-        list.add(id);
-        for (; lexer.token() == Token.PUNC_COMMA; ) {
-            lexer.nextToken();
-            id = identifier(isTable);
-            list.add(id);
-        }
-        return list;
-    }
-
-    protected List<Identifier> idNameList() throws SQLSyntaxErrorException {
-        List<Identifier> list = new ArrayList<Identifier>();
-        if (lexer.token() == Token.PUNC_RIGHT_PAREN) {
-            lexer.nextToken();
-            return list;
-        }
-        list.add(identifier());
-        if (lexer.token() == Token.PUNC_COMMA) {
-            for (; lexer.token() == Token.PUNC_COMMA; ) {
-                lexer.nextToken();
-                list.add(identifier());
-            }
-        }
-        match(Token.PUNC_RIGHT_PAREN);
-        return list;
-    }
-
-    protected List<RowExpression> rowList() throws SQLSyntaxErrorException {
-        List<RowExpression> valuesList;
-        List<Expression> tempRowValue = rowValue();
-        if (lexer.token() == Token.PUNC_COMMA) {
-            valuesList = new LinkedList<RowExpression>();
-            valuesList.add(new RowExpression(tempRowValue));
-            for (; lexer.token() == Token.PUNC_COMMA; ) {
-                lexer.nextToken();
-                tempRowValue = rowValue();
-                valuesList.add(new RowExpression(tempRowValue));
-            }
-        } else {
-            valuesList = new ArrayList<RowExpression>(1);
-            valuesList.add(new RowExpression(tempRowValue));
-        }
-        return valuesList;
     }
 
 }

@@ -71,6 +71,9 @@ public class Parser {
                     stmt = new MySQLDMLParser(lexer, exprParser).delete();
                     ((DMLDeleteStatement)stmt).setConditions(lexer.getAndResetConditions());
                     break stmtSwitch;
+                case Token.KW_REPLACE:
+                    stmt = new MySQLDMLParser(lexer, exprParser).replace();
+                    break stmtSwitch;
                 case Token.IDENTIFIER: {
                     switch (lexer.parseKeyword()) {
                         case Keywords.END:

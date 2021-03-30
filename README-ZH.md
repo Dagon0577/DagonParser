@@ -16,7 +16,7 @@ MySQL高性能解析器，采用byte流解析。
 - [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
 - [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)
 - [Insert](https://dev.mysql.com/doc/refman/8.0/en/insert.html)
+- [Replace](https://dev.mysql.com/doc/refman/8.0/en/replace.html)
 
 # 参考
 [cobar](https://github.com/alibaba/cobar)
-[Timo-parser](https://github.com/Dagon0577/Timo-parser/blob/master/README.md)

@@ -16,6 +16,7 @@ Lexical analysis and grammatical analysis refer to MySQL 8.0
 - [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
 - [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)
 - [Insert](https://dev.mysql.com/doc/refman/8.0/en/insert.html)
+- [Replace](https://dev.mysql.com/doc/refman/8.0/en/replace.html)
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
