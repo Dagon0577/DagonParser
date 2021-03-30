@@ -10,6 +10,11 @@ MySQL high-performance parser, use byte stream parsing.
 
 Lexical analysis and grammatical analysis refer to MySQL 8.0
 
+# Optimization point
+- Pure binary analysis, String is not generated if it is not necessary.
+- Process all supported SQL and generate syntax tree directly after receiving the binary stream to avoid subsequent duplication of work.
+- Synchronous collection of relevant information such as SQL summary during grammar analysis.
+
 # Support statement
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 - [Create](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
