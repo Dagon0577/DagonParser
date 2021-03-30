@@ -8,7 +8,7 @@ import parser.util.Tuple2;
 import java.util.List;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/7/17
  */
 public class MySQLDMLDeleteParserTest extends AbstractSyntaxTest {

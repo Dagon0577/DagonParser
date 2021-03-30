@@ -17,7 +17,7 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * @author huangganyan
+ * @author Dagon0577
  * @date 2020/7/17
  */
 public class DMLDeleteStatement implements DMLStatement {
