@@ -19,7 +19,7 @@ MySQL高性能解析器，采用byte流解析。
 
 词法分析和语法分析参考MySQL 8.0
 
-# 支持语句
+# 解析语句
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 - [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
 - [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)

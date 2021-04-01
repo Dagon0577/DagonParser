@@ -21,7 +21,7 @@ Open the /src/test/java folder, select any statement, and run the unit test.
 - Process all supported SQL and generate syntax tree directly after receiving the binary stream to avoid subsequent duplication of work.
 - Synchronous collection of relevant information such as SQL summary during grammar analysis.
 
-# Support statement
+# Parsed statement
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 - [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
 - [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)
