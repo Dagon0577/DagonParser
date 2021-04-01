@@ -8,6 +8,10 @@
 
 MySQL高性能解析器，采用byte流解析。
 
+# 快速开始
+
+打开/src/test/java文件夹，任意选择语句，运行单元测试。
+
 # 优化点
 - 纯二进制解析，非必要情况不生成String。
 - 处理所有支持的SQL，在收到二进制流之后直接生成语法树，避免后续重复工作。
@@ -51,6 +55,12 @@ MySQL高性能解析器，采用byte流解析。
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
 
-
 # 参考
 [cobar](https://github.com/alibaba/cobar)
+
+# 致谢
+如果你希望被添加到这个名单中，并且提交过 Issue 或者 PR，请与我联系。  
+
+<a href="https://github.com/Dagon0577">
+    <img src="https://avatars0.githubusercontent.com/u/31436836?s=460&v=4" width="75px">
+</a>

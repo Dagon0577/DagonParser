@@ -6,9 +6,15 @@
 [![GitHub stars](https://img.shields.io/github/stars/Dagon0577/DagonParser.svg)](https://github.com/Dagon0577/DagonParser/stargazers)
 [![GitHub license](https://img.shields.io/github/license/Dagon0577/DagonParser.svg)](https://github.com/Dagon0577/DagonParser/blob/master/LICENSE)
 
+- [Chinese documentation](https://github.com/Dagon0577/DagonParser/blob/master/README-ZH.md)
+
 MySQL high-performance parser, use byte stream parsing.
 
 Lexical analysis and grammatical analysis refer to MySQL 8.0
+
+# Quick start
+
+Open the /src/test/java folder, select any statement, and run the unit test.
 
 # Optimization point
 - Pure binary analysis, String is not generated if it is not necessary.
@@ -53,3 +59,10 @@ Lexical analysis and grammatical analysis refer to MySQL 8.0
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
+
+# Thanks
+If you want to be added to this list and have submitted an Issue or PR, please contact me.
+
+<a href="https://github.com/Dagon0577">
+    <img src="https://avatars0.githubusercontent.com/u/31436836?s=460&v=4" width="75px">
+</a>
