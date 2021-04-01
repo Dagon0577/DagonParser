@@ -17,8 +17,8 @@ Lexical analysis and grammatical analysis refer to MySQL 8.0
 Open the /src/test/java folder, select any statement, and run the unit test.
 
 # Optimization point
-- Pure binary analysis, String is not generated if it is not necessary.
-- Process all supported SQL and generate syntax tree directly after receiving the binary stream to avoid subsequent duplication of work.
+- Pure byte stream analysis, String is not generated if it is not necessary.
+- Process all supported SQL, and directly generate the syntax tree after receiving the byte stream to avoid subsequent duplication of work.
 - Synchronous collection of relevant information such as SQL summary during grammar analysis.
 
 # Parsed statement
