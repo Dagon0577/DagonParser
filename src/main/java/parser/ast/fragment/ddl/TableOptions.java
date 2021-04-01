@@ -1,9 +1,9 @@
-package parser.ast.stmt.ddl;
+package parser.ast.fragment.ddl;
 
 import parser.ast.expression.Expression;
 import parser.ast.expression.primary.Identifier;
 import parser.ast.expression.primary.literal.LiteralString;
-import parser.ast.stmt.ddl.alter.AlterSpecification;
+import parser.ast.fragment.ddl.alter.interfaces.AlterSpecification;
 import parser.visitor.Visitor;
 
 import java.util.List;
@@ -54,6 +54,7 @@ public class TableOptions implements AlterSpecification {
     private Identifier tablespace;
     private Integer storage;
     private List<Identifier> union;
+    private Integer globalUnique;
 
     public Expression getAutoIncrement() {
         return autoIncrement;
@@ -261,6 +262,14 @@ public class TableOptions implements AlterSpecification {
 
     public void setUnion(List<Identifier> union) {
         this.union = union;
+    }
+
+    public Integer getGlobalUnique() {
+        return globalUnique;
+    }
+
+    public void setGlobalUnique(Integer globalUnique) {
+        this.globalUnique = globalUnique;
     }
 
     @Override

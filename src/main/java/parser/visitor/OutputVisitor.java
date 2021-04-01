@@ -10,6 +10,31 @@ import parser.ast.fragment.Limit;
 import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.SubpartitionDefinition;
 import parser.ast.fragment.ddl.*;
+import parser.ast.fragment.ddl.alter.AddCheckConstraintDefinition;
+import parser.ast.fragment.ddl.alter.AddColumn;
+import parser.ast.fragment.ddl.alter.AddForeignKey;
+import parser.ast.fragment.ddl.alter.AddKey;
+import parser.ast.fragment.ddl.alter.AlterCharacterSet;
+import parser.ast.fragment.ddl.alter.AlterCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.AlterColumn;
+import parser.ast.fragment.ddl.alter.AlterIndex;
+import parser.ast.fragment.ddl.alter.ChangeColumn;
+import parser.ast.fragment.ddl.alter.ConvertCharacterSet;
+import parser.ast.fragment.ddl.alter.DropCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.DropColumn;
+import parser.ast.fragment.ddl.alter.DropForeignKey;
+import parser.ast.fragment.ddl.alter.DropIndex;
+import parser.ast.fragment.ddl.alter.DropPrimaryKey;
+import parser.ast.fragment.ddl.alter.EnableKeys;
+import parser.ast.fragment.ddl.alter.Force;
+import parser.ast.fragment.ddl.alter.ImportTablespace;
+import parser.ast.fragment.ddl.alter.ModifyColumn;
+import parser.ast.fragment.ddl.alter.OrderByColumns;
+import parser.ast.fragment.ddl.alter.PartitionOperation;
+import parser.ast.fragment.ddl.alter.RenameColumn;
+import parser.ast.fragment.ddl.alter.RenameIndex;
+import parser.ast.fragment.ddl.alter.RenameTo;
+import parser.ast.fragment.ddl.alter.WithValidation;
 import parser.ast.fragment.tableref.*;
 import parser.ast.stmt.SQLStatement;
 import parser.ast.stmt.compound.BeginEndStatement;
@@ -22,11 +47,33 @@ import parser.ast.stmt.compound.cursors.CursorOpenStatement;
 import parser.ast.stmt.compound.flowcontrol.*;
 import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
+import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
-import parser.ast.stmt.ddl.*;
-import parser.ast.stmt.ddl.alter.Algorithm;
-import parser.ast.stmt.ddl.alter.Lock;
+import parser.ast.fragment.ddl.alter.Algorithm;
+import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterEventStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterFunctionStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterInstanceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterLogfileGroupStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterProcedureStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterServerStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterTableStatement;
+import parser.ast.fragment.ddl.alter.Lock;
+import parser.ast.stmt.ddl.alter.DDLAlterTablespaceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterViewStatement;
+import parser.ast.stmt.ddl.create.DDLCreateDatabaseStatement;
+import parser.ast.stmt.ddl.create.DDLCreateEventStatement;
+import parser.ast.stmt.ddl.create.DDLCreateFunctionStatement;
+import parser.ast.stmt.ddl.create.DDLCreateIndexStatement;
+import parser.ast.stmt.ddl.create.DDLCreateLogfileGroupStatement;
+import parser.ast.stmt.ddl.create.DDLCreateProcedureStatement;
+import parser.ast.stmt.ddl.create.DDLCreateServerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
 import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
@@ -4013,5 +4060,814 @@ public class OutputVisitor implements Visitor {
         print(node.getName());
     }
 
+    @Override
+    public void visit(DDLAlterTableStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_TABLE), 0);
+        print(node.getName());
+        if (node.getAlters() != null && !node.getAlters().isEmpty()) {
+            appendable.append(' ');
+            printList(node.getAlters());
+        }
+        if (node.getPartitionOptions() != null) {
+            appendable.append(' ');
+            print(node.getPartitionOptions());
+        }
+    }
+
+    @Override
+    public void visit(DALAlterUserStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(k(Keywords.USER), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        boolean first = true;
+        for (Pair<Expression, AuthOption> p : node.getUsers()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            print(p.getKey());
+            appendable.append(' ');
+            print(p.getValue());
+        }
+        if (node.getRequireNone() != null && node.getRequireNone()) {
+            appendable.append(t(Token.KW_REQUIRE), 0).append(k(Keywords.NONE));
+        } else if (node.getTlsOptions() != null) {
+            appendable.append(t(Token.KW_REQUIRE), 0);
+            first = true;
+            for (Pair<Integer, LiteralString> p : node.getTlsOptions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(t(Token.KW_AND), 0);
+                }
+                switch (p.getKey()) {
+                    case DALAlterUserStatement.TLS_SSL:
+                        appendable.append(t(Token.KW_SSL));
+                        break;
+                    case DALAlterUserStatement.TLS_X509:
+                        appendable.append(k(Keywords.X509));
+                        break;
+                    case DALAlterUserStatement.TLS_CIPHER:
+                        appendable.append(k(Keywords.CIPHER), 2);
+                        print(p.getValue());
+                        break;
+                    case DALAlterUserStatement.TLS_ISSUER:
+                        appendable.append(k(Keywords.ISSUER), 2);
+                        print(p.getValue());
+                        break;
+                    case DALAlterUserStatement.TLS_SUBJECT:
+                        appendable.append(k(Keywords.SUBJECT), 2);
+                        print(p.getValue());
+                        break;
+                }
+            }
+        }
+        if (node.getResourceOptions() != null) {
+            appendable.append(t(Token.KW_WITH), 1);
+            for (Pair<Integer, Long> p : node.getResourceOptions()) {
+                appendable.append(' ');
+                switch (p.getKey()) {
+                    case DALAlterUserStatement.MAX_QUERIES_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_QUERIES_PER_HOUR), 2);
+                        break;
+                    case DALAlterUserStatement.MAX_UPDATES_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_UPDATES_PER_HOUR), 2);
+                        break;
+                    case DALAlterUserStatement.MAX_CONNECTIONS_PER_HOUR:
+                        appendable.append(k(Keywords.MAX_CONNECTIONS_PER_HOUR), 2);
+                        break;
+                    case DALAlterUserStatement.MAX_USER_CONNECTIONS:
+                        appendable.append(k(Keywords.MAX_USER_CONNECTIONS), 2);
+                        break;
+                }
+                appendable.append(p.getValue());
+            }
+        }
+        Tuple3<Integer, Boolean, Long> option = node.getPasswordOption();
+        if (option != null) {
+            appendable.append(k(Keywords.PASSWORD), 0);
+            switch (option._1()) {
+                case DALAlterUserStatement.PASSWORD_EXPIRE:
+                    appendable.append(k(Keywords.EXPIRE), 2);
+                    if (option._2() != null) {
+                        if (option._2()) {
+                            appendable.append(t(Token.KW_DEFAULT));
+                        } else {
+                            appendable.append(k(Keywords.NEVER));
+                        }
+                    } else {
+                        appendable.append(t(Token.KW_INTERVAL), 2);
+                        print(option._3());
+                        appendable.append(k(Keywords.DAY), 1);
+                    }
+                    break;
+                case DALAlterUserStatement.PASSWORD_HISTORY:
+                    appendable.append(k(Keywords.HISTORY), 2);
+                    if (option._2() != null && option._2()) {
+                        appendable.append(t(Token.KW_DEFAULT));
+                    } else {
+                        print(option._3());
+                    }
+                    break;
+                case DALAlterUserStatement.PASSWORD_REUSE_INTERVAL:
+                    appendable.append(k(Keywords.REUSE)).append(t(Token.KW_INTERVAL), 0);
+                    if (option._2() != null && option._2()) {
+                        appendable.append(t(Token.KW_DEFAULT));
+                    } else {
+                        print(option._3());
+                        appendable.append(k(Keywords.DAY), 1);
+                    }
+                    break;
+                case DALAlterUserStatement.PASSWORD_REQUIRE_CURRENT:
+                    appendable.append(t(Token.KW_REQUIRE)).append(k(Keywords.CURRENT), 0);
+                    if (option._2() != null) {
+                        if (option._2()) {
+                            appendable.append(t(Token.KW_DEFAULT));
+                        } else {
+                            appendable.append(k(Keywords.OPTIONAL));
+                        }
+                    }
+                    break;
+            }
+        }
+        if (node.getLock() != null) {
+            if (node.getLock()) {
+                appendable.append(k(Keywords.ACCOUNT), 0).append(t(Token.KW_LOCK));
+            } else {
+                appendable.append(k(Keywords.ACCOUNT), 0).append(t(Token.KW_UNLOCK));
+            }
+        }
+    }
+
+    @Override
+    public void visit(DALAlterResourceGroupStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(k(Keywords.RESOURCE), 0)
+            .append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        if (node.getVcpus() != null) {
+            appendable.append(k(Keywords.VCPU), 1).append('=');
+            printList(node.getVcpus());
+        }
+        if (node.getThreadPriority() != null) {
+            appendable.append(k(Keywords.THREAD_PRIORITY), 1).append('=');
+            print(node.getThreadPriority());
+        }
+        if (node.getEnable() != null) {
+            if (node.getEnable()) {
+                appendable.append(k(Keywords.ENABLE), 1);
+            } else {
+                appendable.append(k(Keywords.DISABLE), 1);
+            }
+            if (node.isForce()) {
+                appendable.append(t(Token.KW_FORCE), 1);
+            }
+        }
+    }
+
+    @Override
+    public void visit(PartitionOperation node) {
+        switch (node.getType()) {
+            case PartitionOperation.ADD:
+                appendable.append(t(Token.KW_ADD)).append(t(Token.KW_PARTITION), 1).append('(');
+                print(node.getDefinition());
+                appendable.append(')');
+                break;
+            case PartitionOperation.DROP:
+                appendable.append(t(Token.KW_DROP)).append(t(Token.KW_PARTITION), 0);
+                printList(node.getNames());
+                break;
+            case PartitionOperation.DISCARD:
+                appendable.append(k(Keywords.DISCARD)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                appendable.append(k(Keywords.TABLESPACE), 1);
+                break;
+            case PartitionOperation.IMPORT:
+                appendable.append(k(Keywords.IMPORT)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                appendable.append(k(Keywords.TABLESPACE), 1);
+                break;
+            case PartitionOperation.TRUNCATE:
+                appendable.append(k(Keywords.TRUNCATE)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.COALESCE:
+                appendable.append(k(Keywords.COALESCE)).append(t(Token.KW_PARTITION), 0);
+                print(node.getNumber());
+                break;
+            case PartitionOperation.REORGANIZE:
+                appendable.append(k(Keywords.REORGANIZE)).append(t(Token.KW_PARTITION), 0);
+                printList(node.getNames());
+                appendable.append(t(Token.KW_INTO)).append('(');
+                printList(node.getDefinitions());
+                appendable.append(')');
+                break;
+            case PartitionOperation.EXCHANGE:
+                appendable.append(k(Keywords.EXCHANGE)).append(t(Token.KW_PARTITION), 0);
+                print(node.getNames().get(0));
+                appendable.append(t(Token.KW_WITH), 0).append(t(Token.KW_TABLE), 2);
+                print(node.getTable());
+                if (node.getWithValidation() != null) {
+                    appendable.append(' ').append(
+                        node.getWithValidation() ? t(Token.KW_WITH) : k(Keywords.WITHOUT), 2)
+                        .append(k(Keywords.VALIDATION));
+                }
+                break;
+            case PartitionOperation.ANALYZE:
+                appendable.append("ANALYZE").append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.CHECK:
+                appendable.append(t(Token.KW_CHECK)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.OPTIMIZE:
+                appendable.append(t(Token.KW_OPTIMIZE)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.REBUILD:
+                appendable.append(k(Keywords.REBUILD)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.REPAIR:
+                appendable.append(k(Keywords.REPAIR)).append(t(Token.KW_PARTITION), 0);
+                if (node.isAll()) {
+                    appendable.append(t(Token.KW_ALL));
+                } else {
+                    printList(node.getNames());
+                }
+                break;
+            case PartitionOperation.REMOVE:
+                appendable.append(k(Keywords.REMOVE)).append(k(Keywords.PARTITIONING), 1);
+                break;
+            case PartitionOperation.UPGRADE:
+                appendable.append(k(Keywords.UPGRADE)).append(k(Keywords.PARTITIONING), 1);
+                break;
+        }
+    }
+
+    @Override
+    public void visit(RenameColumn node) {
+        appendable.append(t(Token.KW_RENAME)).append(t(Token.KW_COLUMN), 0);
+        print(node.getOldColumn());
+        appendable.append(t(Token.KW_TO), 0);
+        print(node.getNewColumn());
+    }
+
+    @Override
+    public void visit(RenameIndex node) {
+        appendable.append(t(Token.KW_RENAME)).append(t(Token.KW_INDEX), 0);
+        print(node.getOldIndex());
+        appendable.append(t(Token.KW_TO), 0);
+        print(node.getNewIndex());
+    }
+
+    @Override
+    public void visit(RenameTo node) {
+        appendable.append(t(Token.KW_RENAME)).append(t(Token.KW_TO), 0);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(WithValidation node) {
+        if (node.isWithout()) {
+            appendable.append(k(Keywords.WITHOUT), 2);
+        } else {
+            appendable.append(t(Token.KW_WITH), 2);
+        }
+        appendable.append(k(Keywords.VALIDATION));
+    }
+
+    @Override
+    public void visit(ImportTablespace node) {
+        appendable.append(node.isImport() ? k(Keywords.IMPORT) : k(Keywords.DISCARD), 2)
+            .append(k(Keywords.TABLESPACE));
+    }
+
+    @Override
+    public void visit(EnableKeys node) {
+        appendable.append(node.isEnable() ? k(Keywords.ENABLE) : k(Keywords.DISABLE), 2)
+            .append(t(Token.KW_KEYS));
+    }
+
+    @Override
+    public void visit(Force node) {
+        appendable.append(t(Token.KW_FORCE));
+    }
+
+    @Override
+    public void visit(AddColumn node) {
+        appendable.append(t(Token.KW_ADD)).append(t(Token.KW_COLUMN), 0);
+        List<Pair<Identifier, ColumnDefinition>> columns = node.getColumns();
+        if (columns.size() == 1) {
+            Pair<Identifier, ColumnDefinition> pair = columns.get(0);
+            print(pair.getKey());
+            appendable.append(' ');
+            print(pair.getValue());
+            if (node.getFirst() != null) {
+                appendable.append(node.getFirst().getKey() ? k(Keywords.FIRST) : k(Keywords.AFTER),
+                    0);
+                print(node.getFirst().getValue());
+            }
+        } else {
+            boolean first = true;
+            for (Pair<Identifier, ColumnDefinition> pair : columns) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(pair.getKey());
+                appendable.append(' ');
+                print(pair.getValue());
+            }
+        }
+    }
+
+    @Override
+    public void visit(AddKey node) {
+        appendable.append(t(Token.KW_ADD), 2);
+        print(node.getDefinition());
+    }
+
+    @Override
+    public void visit(AddCheckConstraintDefinition node) {
+        appendable.append(t(Token.KW_ADD));
+        Tuple3<Identifier, Expression, Boolean> tuple = node.getCheckConstraintDefinition();
+        if (tuple != null) {
+            if (tuple._1() != null) {
+                appendable.append(t(Token.KW_CONSTRAINT), 0);
+                print(tuple._1());
+            }
+            appendable.append(t(Token.KW_CHECK), 1);
+            appendable.append('(');
+            print(tuple._2());
+            appendable.append(')');
+            if (tuple._3() != null) {
+                if (tuple._3()) {
+                    appendable.append(" ENFORCED");
+                } else {
+                    appendable.append(t(Token.KW_NOT), 0);
+                    appendable.append("ENFORCED");
+                }
+            }
+        }
+    }
+
+    @Override
+    public void visit(AddForeignKey node) {
+        appendable.append(t(Token.KW_ADD), 2);
+        print(node.getDefinition());
+    }
+
+    @Override
+    public void visit(DropCheckConstraintDefination node) {
+        appendable.append(t(Token.KW_DROP), 2).append(t(Token.KW_CHECK), 2);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DropColumn node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_COLUMN), 0);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DropForeignKey node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_FOREIGN), 0).append(t(Token.KW_KEY),
+            2);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DropIndex node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_INDEX), 0);
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DropPrimaryKey node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_PRIMARY), 0).append(t(Token.KW_KEY));
+    }
+    @Override
+    public void visit(ModifyColumn node) {
+        appendable.append(k(Keywords.MODIFY)).append(t(Token.KW_COLUMN), 0);
+        print(node.getName());
+        appendable.append(' ');
+        print(node.getDefinition());
+        if (node.getFirst() != null) {
+            appendable.append(node.getFirst().getKey() ? k(Keywords.FIRST) : k(Keywords.AFTER), 0);
+            print(node.getFirst().getValue());
+        }
+    }
+
+    @Override
+    public void visit(OrderByColumns node) {
+        appendable.append(t(Token.KW_ORDER)).append(t(Token.KW_BY), 0);
+        boolean first = true;
+        for (Identifier col : node.getColumns()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            print(col);
+        }
+    }
+
+    @Override
+    public void visit(ChangeColumn node) {
+        appendable.append(t(Token.KW_CHANGE)).append(t(Token.KW_COLUMN), 0);
+        print(node.getOldColumn());
+        appendable.append(' ');
+        print(node.getNewColumn());
+        appendable.append(' ');
+        print(node.getDefinition());
+        if (node.getFirst() != null) {
+            appendable.append(node.getFirst().getKey() ? k(Keywords.FIRST) : k(Keywords.AFTER), 0);
+            print(node.getFirst().getValue());
+        }
+    }
+
+    @Override
+    public void visit(ConvertCharacterSet node) {
+        if (node.getConverOrDefault()) {
+            appendable.append(t(Token.KW_CONVERT)).append(t(Token.KW_TO), 0);
+            appendable.append(t(Token.KW_CHARACTER)).append(t(Token.KW_SET), 0);
+            print(node.getCharset());
+            if (node.getCollate() != null) {
+                appendable.append(t(Token.KW_COLLATE), 0);
+                print(node.getCollate());
+            }
+        } else {
+            appendable.append(t(Token.KW_DEFAULT), 2);
+            appendable.append(t(Token.KW_CHARACTER)).append(t(Token.KW_SET), 0).append('=');
+            print(node.getCharset());
+            if (node.getCollate() != null) {
+                appendable.append(t(Token.KW_COLLATE), 0).append('=');
+                print(node.getCollate());
+            }
+        }
+    }
+
+
+    @Override
+    public void visit(AlterCheckConstraintDefination node) {
+        appendable.append(t(Token.KW_ALTER), 2).append(t(Token.KW_CHECK), 2);
+        print(node.getName());
+        if (!node.getEnforced()) {
+            appendable.append(t(Token.KW_NOT), 2);
+        }
+        appendable.append("ENFORCED");
+    }
+
+    @Override
+    public void visit(AlterCharacterSet node) {
+        appendable.append(t(Token.KW_DEFAULT)).append(t(Token.KW_CHARACTER), 0)
+            .append(t(Token.KW_SET)).append('=');
+        if (node.getCharset() != null) {
+            print(node.getCharset());
+        }
+        if (node.getCollate() != null) {
+            appendable.append(t(Token.KW_COLLATE), 0);
+            print(node.getCollate());
+        }
+    }
+
+    @Override
+    public void visit(AlterColumn node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_COLUMN), 0);
+        print(node.getName());
+        if (node.isDropDefault()) {
+            appendable.append(t(Token.KW_DROP), 0).append(t(Token.KW_DEFAULT));
+        } else {
+            appendable.append(t(Token.KW_SET), 0).append(t(Token.KW_DEFAULT), 2);
+            print(node.getDefaultVal());
+        }
+    }
+
+    @Override
+    public void visit(AlterIndex node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_INDEX), 0);
+        print(node.getName());
+        if (node.isVisible()) {
+            appendable.append(k(Keywords.VISIBLE), 1);
+        } else {
+            appendable.append(k(Keywords.INVISIBLE), 1);
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterDatabaseStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_DATABASE), 0);
+        print(node.getDb());
+        if (node.getCharset() != null) {
+            appendable.append(t(Token.KW_CHARACTER), 0).append(t(Token.KW_SET), 2);
+            print(node.getCharset());
+        }
+        if (node.getCollate() != null) {
+            appendable.append(t(Token.KW_COLLATE), 0);
+            print(node.getCollate());
+        }
+        if (node.isEncryption() != null) {
+            if (node.isEncryption()) {
+                appendable.append(t(Token.KW_DEFAULT), 0).append(k(Keywords.ENCRYPTION), 2)
+                    .append("'Y'");
+            } else {
+                appendable.append(t(Token.KW_DEFAULT), 0).append(k(Keywords.ENCRYPTION), 2)
+                    .append("'N'");
+            }
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterEventStatement node) {
+        appendable.append(t(Token.KW_ALTER), 2);
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER)).append('=');
+            print(node.getDefiner());
+            appendable.append(' ');
+        }
+        appendable.append(k(Keywords.EVENT), 2);
+        print(node.getEvent());
+        if (node.getSchedule() != null) {
+            appendable.append(' ');
+            appendable.append(t(Token.KW_ON), 2);
+            appendable.append(k(Keywords.SCHEDULE), 2);
+            print(node.getSchedule());
+        }
+        if (node.getPreserve() != null) {
+            appendable.append(' ');
+            appendable.append(t(Token.KW_ON), 2);
+            appendable.append(k(Keywords.COMPLETION), 2);
+            if (!node.getPreserve()) {
+                appendable.append(t(Token.KW_NOT), 2);
+            }
+            appendable.append(k(Keywords.PRESERVE));
+        }
+        if (node.getRenameTo() != null) {
+            appendable.append(' ');
+            appendable.append(t(Token.KW_RENAME), 2);
+            appendable.append(t(Token.KW_TO), 2);
+            print(node.getRenameTo());
+        }
+        if (node.getEnableType() != null) {
+            appendable.append(' ');
+            switch (node.getEnableType()) {
+                case DDLAlterEventStatement.ENABLE:
+                    appendable.append(k(Keywords.ENABLE));
+                    break;
+                case DDLAlterEventStatement.DISABLE:
+                    appendable.append(k(Keywords.DISABLE));
+                    break;
+                case DDLAlterEventStatement.DISABLE_ON_SLAVE:
+                    appendable.append(k(Keywords.DISABLE));
+                    appendable.append(t(Token.KW_ON), 0);
+                    appendable.append(k(Keywords.SLAVE));
+                    break;
+            }
+        }
+        if (node.getComment() != null) {
+            appendable.append(k(Keywords.COMMENT), 0);
+            print(node.getComment());
+        }
+        if (node.getEventBody() != null) {
+            appendable.append(k(Keywords.DO), 0);
+            print(node.getEventBody());
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterFunctionStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_FUNCTION), 0);
+        print(node.getName());
+        List<Characteristic> list = node.getCharacteristics();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(' ');
+            printList(list, ' ');
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterInstanceStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(k(Keywords.INSTANCE), 0);
+        switch (node.getType()) {
+            case DDLAlterInstanceStatement.ROTATE_INNODB:
+                appendable.append(k(Keywords.ROTATE), 2).append("INNODB")
+                    .append(k(Keywords.MASTER), 0).append(t(Token.KW_KEY));
+                break;
+            case DDLAlterInstanceStatement.ROTATE_BINLOG:
+                appendable.append(k(Keywords.ROTATE), 2).append(k(Keywords.BINLOG))
+                    .append(k(Keywords.MASTER), 0).append(t(Token.KW_KEY));
+                break;
+            case DDLAlterInstanceStatement.RELOAD_TLS:
+                appendable.append(k(Keywords.RELOAD), 2).append("TLS");
+                break;
+            case DDLAlterInstanceStatement.RELOAD_TLS_NO:
+                appendable.append(k(Keywords.RELOAD), 2).append("TLS").append(k(Keywords.NO), 0)
+                    .append(k(Keywords.ROLLBACK), 2).append(t(Token.KW_ON), 2)
+                    .append(k(Keywords.ERROR));
+                break;
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterLogfileGroupStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(k(Keywords.LOGFILE), 0)
+            .append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        appendable.append(t(Token.KW_ADD), 0).append(k(Keywords.UNDOFILE), 2);
+        print(node.getUndoFile());
+        if (node.getInitialSize() != null) {
+            appendable.append(k(Keywords.INITIAL_SIZE), 1).append('=');
+            print(node.getInitialSize());
+        }
+        if (node.isWait()) {
+            appendable.append(k(Keywords.WAIT), 1);
+        }
+        if (node.getEngine() != null) {
+            appendable.append(k(Keywords.ENGINE), 1).append('=');
+            print(node.getEngine());
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterProcedureStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(t(Token.KW_PROCEDURE), 0);
+        print(node.getName());
+        List<Characteristic> list = node.getCharacteristics();
+        if (list != null && !list.isEmpty()) {
+            appendable.append(' ');
+            printList(list, ' ');
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterServerStatement node) {
+        appendable.append(t(Token.KW_ALTER)).append(k(Keywords.SERVER), 0);
+        print(node.getServerName());
+        if (node.getOptions() != null && !node.getOptions().isEmpty()) {
+            appendable.append(k(Keywords.OPTIONS), 0).append('(');
+            boolean first = true;
+            for (Pair<Integer, Literal> option : node.getOptions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                switch (option.getKey()) {
+                    case DDLCreateServerStatement.HOST:
+                        appendable.append(k(Keywords.HOST));
+                        break;
+                    case DDLCreateServerStatement.DATABASE:
+                        appendable.append(t(Token.KW_DATABASE));
+                        break;
+                    case DDLCreateServerStatement.USER:
+                        appendable.append(k(Keywords.USER));
+                        break;
+                    case DDLCreateServerStatement.PASSWORD:
+                        appendable.append(k(Keywords.PASSWORD));
+                        break;
+                    case DDLCreateServerStatement.SOCKET:
+                        appendable.append(k(Keywords.SOCKET));
+                        break;
+                    case DDLCreateServerStatement.OWNER:
+                        appendable.append(k(Keywords.OWNER));
+                        break;
+                    case DDLCreateServerStatement.PORT:
+                        appendable.append(k(Keywords.PORT));
+                        break;
+                }
+                appendable.append(' ');
+                print(option.getValue());
+            }
+            appendable.append(')');
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterTablespaceStatement node) {
+        appendable.append(t(Token.KW_ALTER));
+        if (node.isUndo()) {
+            appendable.append(t(Token.KW_UNDO), 1);
+        }
+        appendable.append(k(Keywords.TABLESPACE), 0);
+        print(node.getName());
+        if (node.getFileName() != null) {
+            appendable.append(node.isAddFile() ? t(Token.KW_ADD) : t(Token.KW_DROP), 0)
+                .append(k(Keywords.DATAFILE), 2);
+            print(node.getFileName());
+        }
+        if (node.getInitialSize() != null) {
+            appendable.append(k(Keywords.INITIAL_SIZE), 1).append('=');
+            print(node.getInitialSize());
+        }
+        if (node.isWait()) {
+            appendable.append(k(Keywords.WAIT), 1);
+        }
+        if (node.getRenameTo() != null) {
+            appendable.append(t(Token.KW_RENAME), 0).append(t(Token.KW_TO), 2);
+            print(node.getRenameTo());
+        }
+        if (node.getSetActive() != null) {
+            appendable.append(t(Token.KW_SET), 0)
+                .append(node.getSetActive() ? k(Keywords.ACTIVE) : k(Keywords.INACTIVE));
+        }
+        if (node.getEncryption() != null) {
+            appendable.append(k(Keywords.ENCRYPTION), 1).append('=');
+            if (node.getEncryption()) {
+                appendable.append("'Y'");
+            } else {
+                appendable.append("'N'");
+            }
+        }
+        if (node.getEngine() != null) {
+            appendable.append(k(Keywords.ENGINE), 1).append('=');
+            print(node.getEngine());
+        }
+    }
+
+    @Override
+    public void visit(DDLAlterViewStatement node) {
+        appendable.append(t(Token.KW_ALTER));
+        if (node.getAlgorithm() != null) {
+            switch (node.getAlgorithm()) {
+                case DDLCreateViewStatement.UNDEFINED:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=')
+                        .append(k(Keywords.UNDEFINED));
+                    break;
+                case DDLCreateViewStatement.MERGE:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=')
+                        .append(k(Keywords.MERGE));
+                    break;
+                case DDLCreateViewStatement.TEMPTABLE:
+                    appendable.append(k(Keywords.ALGORITHM), 1).append('=')
+                        .append(k(Keywords.TEMPTABLE));
+                    break;
+            }
+        }
+        if (node.getDefiner() != null) {
+            appendable.append(k(Keywords.DEFINER), 1).append('=');
+            print(node.getDefiner());
+        }
+        if (node.getSqlSecurityDefiner() != null) {
+            appendable.append(t(Token.KW_SQL), 0).append(k(Keywords.SECURITY), 2).append(
+                node.getSqlSecurityDefiner() ? k(Keywords.DEFINER) : k(Keywords.INVOKER));
+        }
+        appendable.append(k(Keywords.VIEW), 0);
+        print(node.getName());
+        List<Identifier> columnsList = node.getColumns();
+        if (columnsList != null && !columnsList.isEmpty()) {
+            appendable.append('(');
+            boolean isFst = true;
+            for (Identifier p : columnsList) {
+                if (isFst) {
+                    isFst = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(p);
+            }
+            appendable.append(')');
+        }
+        appendable.append(t(Token.KW_AS), 0);
+        print(node.getStmt());
+        if (node.isWithCheckOption()) {
+            appendable.append(t(Token.KW_WITH), 0);
+            if (node.getCascaded() != null) {
+                appendable.append(node.getCascaded() ? k(Keywords.CASCADED) : k(Keywords.LOCAL), 2);
+            }
+            appendable.append(t(Token.KW_CHECK)).append(t(Token.KW_OPTION), 1);
+        }
+    }
 }
 

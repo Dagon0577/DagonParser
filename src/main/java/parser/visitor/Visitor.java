@@ -9,6 +9,31 @@ import parser.ast.fragment.Limit;
 import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.SubpartitionDefinition;
 import parser.ast.fragment.ddl.*;
+import parser.ast.fragment.ddl.alter.AddCheckConstraintDefinition;
+import parser.ast.fragment.ddl.alter.AddColumn;
+import parser.ast.fragment.ddl.alter.AddForeignKey;
+import parser.ast.fragment.ddl.alter.AddKey;
+import parser.ast.fragment.ddl.alter.AlterCharacterSet;
+import parser.ast.fragment.ddl.alter.AlterCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.AlterColumn;
+import parser.ast.fragment.ddl.alter.AlterIndex;
+import parser.ast.fragment.ddl.alter.ChangeColumn;
+import parser.ast.fragment.ddl.alter.ConvertCharacterSet;
+import parser.ast.fragment.ddl.alter.DropCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.DropColumn;
+import parser.ast.fragment.ddl.alter.DropForeignKey;
+import parser.ast.fragment.ddl.alter.DropIndex;
+import parser.ast.fragment.ddl.alter.DropPrimaryKey;
+import parser.ast.fragment.ddl.alter.EnableKeys;
+import parser.ast.fragment.ddl.alter.Force;
+import parser.ast.fragment.ddl.alter.ImportTablespace;
+import parser.ast.fragment.ddl.alter.ModifyColumn;
+import parser.ast.fragment.ddl.alter.OrderByColumns;
+import parser.ast.fragment.ddl.alter.PartitionOperation;
+import parser.ast.fragment.ddl.alter.RenameColumn;
+import parser.ast.fragment.ddl.alter.RenameIndex;
+import parser.ast.fragment.ddl.alter.RenameTo;
+import parser.ast.fragment.ddl.alter.WithValidation;
 import parser.ast.fragment.tableref.*;
 import parser.ast.stmt.compound.BeginEndStatement;
 import parser.ast.stmt.compound.DeclareStatement;
@@ -20,11 +45,33 @@ import parser.ast.stmt.compound.cursors.CursorOpenStatement;
 import parser.ast.stmt.compound.flowcontrol.*;
 import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
+import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
-import parser.ast.stmt.ddl.*;
-import parser.ast.stmt.ddl.alter.Algorithm;
-import parser.ast.stmt.ddl.alter.Lock;
+import parser.ast.fragment.ddl.alter.Algorithm;
+import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterEventStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterFunctionStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterInstanceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterLogfileGroupStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterProcedureStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterServerStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterTableStatement;
+import parser.ast.fragment.ddl.alter.Lock;
+import parser.ast.stmt.ddl.alter.DDLAlterTablespaceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterViewStatement;
+import parser.ast.stmt.ddl.create.DDLCreateDatabaseStatement;
+import parser.ast.stmt.ddl.create.DDLCreateEventStatement;
+import parser.ast.stmt.ddl.create.DDLCreateFunctionStatement;
+import parser.ast.stmt.ddl.create.DDLCreateIndexStatement;
+import parser.ast.stmt.ddl.create.DDLCreateLogfileGroupStatement;
+import parser.ast.stmt.ddl.create.DDLCreateProcedureStatement;
+import parser.ast.stmt.ddl.create.DDLCreateServerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
 import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
@@ -252,4 +299,78 @@ public interface Visitor {
     public void visit(CursorFetchStatement node);
 
     public void visit(CursorOpenStatement node);
+
+    public void visit(PartitionOperation node);
+
+    public void visit(RenameColumn node);
+
+    public void visit(RenameIndex node);
+
+    public void visit(RenameTo node);
+
+    public void visit(WithValidation node);
+
+    public void visit(ImportTablespace node);
+
+    public void visit(EnableKeys node);
+
+    public void visit(Force node);
+
+    public void visit(AddColumn node);
+
+    public void visit(AddKey node);
+
+    public void visit(AddForeignKey node);
+
+    public void visit(AddCheckConstraintDefinition node);
+
+    public void visit(DropCheckConstraintDefination node);
+
+    public void visit(DropColumn node);
+
+    public void visit(DropForeignKey node);
+
+    public void visit(DropIndex node);
+
+    public void visit(DropPrimaryKey node);
+
+    public void visit(ModifyColumn node);
+
+    public void visit(OrderByColumns node);
+
+    public void visit(ChangeColumn node);
+
+    public void visit(ConvertCharacterSet node);
+
+    public void visit(AlterCheckConstraintDefination node);
+
+    public void visit(AlterCharacterSet node);
+
+    public void visit(AlterColumn node);
+
+    public void visit(AlterIndex node);
+
+    public void visit(DDLAlterDatabaseStatement node);
+
+    public void visit(DDLAlterEventStatement node);
+
+    public void visit(DDLAlterFunctionStatement node);
+
+    public void visit(DDLAlterInstanceStatement node);
+
+    public void visit(DDLAlterLogfileGroupStatement node);
+
+    public void visit(DDLAlterProcedureStatement node);
+
+    public void visit(DDLAlterServerStatement node);
+
+    public void visit(DDLAlterTablespaceStatement node);
+
+    public void visit(DDLAlterViewStatement node);
+
+    public void visit(DDLAlterTableStatement node);
+
+    public void visit(DALAlterUserStatement node);
+
+    public void visit(DALAlterResourceGroupStatement node);
 }

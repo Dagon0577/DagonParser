@@ -1,10 +1,11 @@
-package parser.ast.stmt.ddl.alter;
+package parser.ast.fragment.ddl.alter;
 
+import parser.ast.fragment.ddl.alter.interfaces.AlterSpecification;
 import parser.visitor.Visitor;
 
 /**
  * @author Dagon0577
- * @date 2019年1月21日 下午3:10:02
+ * @date 2021年04月01日
  */
 public class Lock implements AlterSpecification {
     public static final int DEFAULT = 1;

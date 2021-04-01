@@ -59,7 +59,6 @@ import parser.visitor.Visitor;
  *       </pre>
  */
 public class ColumnDefinition implements AST {
-
     public static final int STORAGE_DISK = 1;
     public static final int STORAGE_MEMORY = 2;
     public static final int STORAGE_DEFAULT = 3;
@@ -83,9 +82,10 @@ public class ColumnDefinition implements AST {
     private final Expression onUpdate;
     private final Tuple3<Identifier, Expression, Boolean> checkConstraintDef;
 
-    public ColumnDefinition(DataType dataType, boolean notNull, Expression defaultVal, Boolean autoIncrement,
-        Boolean uniqueKey, Boolean primaryKey, LiteralString comment, Integer columnFormat, Integer storage,
-        ReferenceDefinition referenceDefinition, Expression as, Boolean virtual, Boolean stored, Expression onUpdate,
+    public ColumnDefinition(DataType dataType, boolean notNull, Expression defaultVal,
+        Boolean autoIncrement, Boolean uniqueKey, Boolean primaryKey, LiteralString comment,
+        Integer columnFormat, Integer storage, ReferenceDefinition referenceDefinition,
+        Expression as, Boolean virtual, Boolean stored, Expression onUpdate,
         Tuple3<Identifier, Expression, Boolean> checkConstraintDef) {
         this.dataType = dataType;
         this.notNull = notNull;
@@ -170,4 +170,5 @@ public class ColumnDefinition implements AST {
     }
 
 }
+
 

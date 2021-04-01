@@ -1,5 +1,6 @@
-package parser.ast.stmt.ddl.alter;
+package parser.ast.fragment.ddl.alter;
 
+import parser.ast.fragment.ddl.alter.interfaces.AlterSpecification;
 import parser.visitor.Visitor;
 
 /**

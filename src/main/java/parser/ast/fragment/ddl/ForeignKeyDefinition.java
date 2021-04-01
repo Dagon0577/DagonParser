@@ -1,4 +1,4 @@
-package parser.ast.stmt.ddl;
+package parser.ast.fragment.ddl;
 
 import parser.ast.AST;
 import parser.ast.expression.primary.Identifier;

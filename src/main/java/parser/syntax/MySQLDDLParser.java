@@ -8,15 +8,63 @@ import parser.ast.expression.primary.literal.LiteralNumber;
 import parser.ast.expression.primary.literal.LiteralString;
 import parser.ast.fragment.SubpartitionDefinition;
 import parser.ast.fragment.ddl.*;
+import parser.ast.fragment.ddl.alter.AddCheckConstraintDefinition;
+import parser.ast.fragment.ddl.alter.AddColumn;
+import parser.ast.fragment.ddl.alter.AddForeignKey;
+import parser.ast.fragment.ddl.alter.AddKey;
+import parser.ast.fragment.ddl.alter.AlterCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.AlterColumn;
+import parser.ast.fragment.ddl.alter.AlterIndex;
+import parser.ast.fragment.ddl.alter.ChangeColumn;
+import parser.ast.fragment.ddl.alter.ConvertCharacterSet;
+import parser.ast.fragment.ddl.alter.DropCheckConstraintDefination;
+import parser.ast.fragment.ddl.alter.DropColumn;
+import parser.ast.fragment.ddl.alter.DropForeignKey;
+import parser.ast.fragment.ddl.alter.DropIndex;
+import parser.ast.fragment.ddl.alter.DropPrimaryKey;
+import parser.ast.fragment.ddl.alter.EnableKeys;
+import parser.ast.fragment.ddl.alter.Force;
+import parser.ast.fragment.ddl.alter.ImportTablespace;
+import parser.ast.fragment.ddl.alter.ModifyColumn;
+import parser.ast.fragment.ddl.alter.OrderByColumns;
+import parser.ast.fragment.ddl.alter.PartitionOperation;
+import parser.ast.fragment.ddl.alter.RenameColumn;
+import parser.ast.fragment.ddl.alter.RenameIndex;
+import parser.ast.fragment.ddl.alter.RenameTo;
+import parser.ast.fragment.ddl.alter.WithValidation;
+import parser.ast.fragment.ddl.alter.interfaces.AlterSpecification;
 import parser.ast.stmt.SQLStatement;
 import parser.ast.stmt.compound.condition.Characteristic;
 import parser.ast.stmt.dal.account.AuthOption;
+import parser.ast.stmt.dal.account.DALAlterUserStatement;
 import parser.ast.stmt.dal.account.DALCreateRoleStatement;
 import parser.ast.stmt.dal.account.DALCreateUserStatement;
+import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
-import parser.ast.stmt.ddl.*;
-import parser.ast.stmt.ddl.alter.Algorithm;
-import parser.ast.stmt.ddl.alter.Lock;
+import parser.ast.fragment.ddl.alter.Algorithm;
+import parser.ast.fragment.ddl.alter.Lock;
+import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterEventStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterFunctionStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterInstanceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterLogfileGroupStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterProcedureStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterServerStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterTableStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterTablespaceStatement;
+import parser.ast.stmt.ddl.alter.DDLAlterViewStatement;
+import parser.ast.stmt.ddl.create.DDLCreateDatabaseStatement;
+import parser.ast.stmt.ddl.create.DDLCreateEventStatement;
+import parser.ast.stmt.ddl.create.DDLCreateFunctionStatement;
+import parser.ast.stmt.ddl.create.DDLCreateIndexStatement;
+import parser.ast.stmt.ddl.create.DDLCreateLogfileGroupStatement;
+import parser.ast.stmt.ddl.create.DDLCreateProcedureStatement;
+import parser.ast.stmt.ddl.create.DDLCreateServerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
+import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
+import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
 import parser.lexer.Lexer;
 import parser.token.IntervalUnit;
 import parser.token.Keywords;
@@ -1013,210 +1061,1307 @@ public class MySQLDDLParser extends AbstractParser {
         return new DDLCreateDatabaseStatement(ifNotExist, db, charset, collate, isEncryption);
     }
 
-    public PartitionOptions partionOptions() throws SQLSyntaxErrorException {
-        PartitionOptions partitionOptions = new PartitionOptions();
-        if (lexer.token() == Token.KW_PARTITION) {
+    public SQLStatement alter() throws SQLSyntaxErrorException {
+        match(Token.KW_ALTER);
+        switch (lexer.token()) {
+            case Token.KW_TABLE:
+                return alterTable();
+            case Token.KW_SCHEMA:
+            case Token.KW_DATABASE:
+                return alterDatabase();
+            case Token.KW_FUNCTION:
+                return alterFunction();
+            case Token.KW_PROCEDURE:
+                return alterProcedure();
+            case Token.KW_UNDO:
+                lexer.nextToken();
+                return alterTablespace(true);
+            case Token.KW_SQL:
+                return alterView(null);
+            case Token.IDENTIFIER:
+                switch (lexer.parseKeyword()) {
+                    case Keywords.DEFINER:
+                        lexer.nextToken();
+                        match(Token.OP_EQUALS);
+                        Expression definer = exprParser.expression();
+                        if (lexer.token() == Token.IDENTIFIER) {
+                            int key = lexer.parseKeyword();
+                            if (key == Keywords.EVENT) {
+                                return alterEvent(definer);
+                            } else if (key == Keywords.VIEW) {
+                                return alterView(definer);
+                            }
+                        }
+                    case Keywords.EVENT:
+                        return alterEvent(null);
+                    case Keywords.INSTANCE:
+                        return alterInstance();
+                    case Keywords.LOGFILE:
+                        return alterLogfileGroup();
+                    case Keywords.RESOURCE:
+                        return alterResouceGroup();
+                    case Keywords.SERVER:
+                        return alterServer();
+                    case Keywords.TABLESPACE:
+                        return alterTablespace(false);
+                    case Keywords.ALGORITHM:
+                    case Keywords.VIEW:
+                        return alterView(null);
+                    case Keywords.USER:
+                        return alterUser();
+                }
+        }
+        return null;
+    }
+
+    private SQLStatement alterView(Expression definer) throws SQLSyntaxErrorException {
+        Integer algorithm = null;
+        Boolean sqlSecurityDefiner = null;
+        Identifier name = null;
+        List<Identifier> columns = null;
+        SQLStatement stmt = null;
+        boolean withCheckOption = false;
+        Boolean cascaded = null;
+        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.ALGORITHM) {
             lexer.nextToken();
-            match(Token.KW_BY);
-            switch (lexer.token()) {
-                case Token.KW_LINEAR:
+            match(Token.OP_EQUALS);
+            if (lexer.token() == Token.IDENTIFIER) {
+                int key = lexer.parseKeyword();
+                if (key == Keywords.UNDEFINED) {
+                    algorithm = DDLCreateViewStatement.UNDEFINED;
                     lexer.nextToken();
-                    partitionOptions.setLiner(true);
-                    if (lexer.parseKeyword() == Keywords.HASH) {
+                } else if (key == Keywords.MERGE) {
+                    algorithm = DDLCreateViewStatement.MERGE;
+                    lexer.nextToken();
+                } else {
+                    matchKeywords(Keywords.TEMPTABLE);
+                    algorithm = DDLCreateViewStatement.TEMPTABLE;
+                }
+            }
+        }
+        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.DEFINER) {
+            lexer.nextToken();
+            match(Token.OP_EQUALS);
+            definer = exprParser.expression();
+        }
+        if (lexer.token() == Token.KW_SQL) {
+            lexer.nextToken();
+            matchKeywords(Keywords.SECURITY);
+            if (lexer.token() == Token.IDENTIFIER) {
+                if (lexer.parseKeyword() == Keywords.DEFINER) {
+                    lexer.nextToken();
+                    sqlSecurityDefiner = true;
+                } else {
+                    matchKeywords(Keywords.INVOKER);
+                    sqlSecurityDefiner = false;
+                }
+            }
+        }
+        matchKeywords(Keywords.VIEW);
+        name = identifier(false);
+        if (lexer.token() == Token.PUNC_LEFT_PAREN) {
+            lexer.nextToken();
+            columns = new ArrayList<>();
+            Identifier column = identifier(false);
+            columns.add(column);
+            while (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+                column = identifier(false);
+                columns.add(column);
+            }
+            match(Token.PUNC_RIGHT_PAREN);
+        }
+        match(Token.KW_AS);
+        stmt = new MySQLDMLSelectParser(lexer, exprParser).select();
+        if (lexer.token() == Token.KW_WITH) {
+            if (lexer.nextToken() == Token.IDENTIFIER) {
+                int key = lexer.parseKeyword();
+                if (key == Keywords.CASCADED) {
+                    cascaded = true;
+                    lexer.nextToken();
+                } else if (key == Keywords.LOCAL) {
+                    cascaded = false;
+                    lexer.nextToken();
+                } else {
+                    throw new SQLSyntaxErrorException("unexpected SQL!");
+                }
+            }
+            if (lexer.token() == Token.KW_CHECK) {
+                lexer.nextToken();
+                match(Token.KW_OPTION);
+                withCheckOption = true;
+            }
+        }
+        return new DDLAlterViewStatement(algorithm, definer, sqlSecurityDefiner, name, columns,
+            stmt, withCheckOption, cascaded);
+    }
+
+    private SQLStatement alterUser() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        List<Pair<Expression, AuthOption>> users = null;
+        Boolean requireNone = null;
+        List<Pair<Integer, LiteralString>> tlsOptions = null;
+        List<Pair<Integer, Long>> resourceOptions = null;
+        Tuple3<Integer, Boolean, Long> passwordOption = null;
+        Boolean lock = null;
+        matchKeywords(Keywords.USER);
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        Pair<Expression, AuthOption> user = user();
+        users = new ArrayList<>();
+        users.add(user);
+        if (user.getKey() instanceof Identifier) {
+            while (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+                user = user();
+                users.add(user);
+            }
+        }
+        if (lexer.token() == Token.KW_REQUIRE) {
+            if (lexer.nextToken() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.NONE) {
+                lexer.nextToken();
+                requireNone = true;
+            } else {
+                Pair<Integer, LiteralString> tlsOption = tlsOption();
+                tlsOptions = new ArrayList<>();
+                if (tlsOption.getKey() != DALAlterUserStatement.TLS_SSL
+                    && tlsOption.getKey() != DALAlterUserStatement.TLS_X509) {
+                    while (tlsOption != null) {
+                        tlsOptions.add(tlsOption);
+                        if (lexer.token() == Token.KW_AND) {
+                            lexer.nextToken();
+                        }
+                        tlsOption = tlsOption();
+                    }
+                } else {
+                    tlsOptions.add(tlsOption);
+                    if (lexer.token() == Token.KW_AND) {
+                        throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                    }
+                }
+            }
+        }
+        if (lexer.token() == Token.KW_WITH) {
+            lexer.nextToken();
+            Pair<Integer, Long> resourceOption = resourceOption();
+            resourceOptions = new ArrayList<>();
+            while (resourceOption != null) {
+                resourceOptions.add(resourceOption);
+                resourceOption = resourceOption();
+            }
+        }
+        if (lexer.token() == Token.IDENTIFIER) {
+            if (lexer.parseKeyword() == Keywords.PASSWORD) {
+                Integer type = null;
+                Boolean isDefault = null;
+                Long day = null;
+                lexer.nextToken();
+                switch (lexer.token()) {
+                    case Token.KW_REQUIRE:
                         lexer.nextToken();
-                        match(Token.PUNC_LEFT_PAREN);
-                        partitionOptions.setHash(exprParser.expression());
-                        match(Token.PUNC_RIGHT_PAREN);
-                    } else if (lexer.token() == Token.KW_KEY) {
-                        lexer.nextToken();
-                        partitionOptions.setKey(true);
-                        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.ALGORITHM) {
+                        matchKeywords(Keywords.CURRENT);
+                        type = DALAlterUserStatement.PASSWORD_REQUIRE_CURRENT;
+                        if (lexer.token() == Token.KW_DEFAULT) {
+                            isDefault = true;
+                        } else {
+                            matchKeywords(Keywords.OPTIONAL);
+                            isDefault = false;
+                        }
+                        break;
+                    case Token.IDENTIFIER: {
+                        switch (lexer.parseKeyword()) {
+                            case Keywords.EXPIRE:
+                                type = DALAlterUserStatement.PASSWORD_EXPIRE;
+                                if (lexer.nextToken() == Token.KW_DEFAULT) {
+                                    isDefault = true;
+                                    lexer.nextToken();
+                                } else if (lexer.token() == Token.KW_INTERVAL) {
+                                    lexer.nextToken();
+                                    day = exprParser.longValue();
+                                    matchKeywords(Keywords.DAY);
+                                } else {
+                                    matchKeywords(Keywords.NEVER);
+                                    isDefault = false;
+                                }
+                                break;
+                            case Keywords.HISTORY:
+                                type = DALAlterUserStatement.PASSWORD_HISTORY;
+                                if (lexer.nextToken() == Token.KW_DEFAULT) {
+                                    isDefault = true;
+                                    lexer.nextToken();
+                                } else {
+                                    day = exprParser.longValue();
+                                }
+                                break;
+                            case Keywords.REUSE:
+                                lexer.nextToken();
+                                match(Token.KW_INTERVAL);
+                                type = DALAlterUserStatement.PASSWORD_REUSE_INTERVAL;
+                                if (lexer.token() == Token.KW_DEFAULT) {
+                                    isDefault = true;
+                                    lexer.nextToken();
+                                } else {
+                                    day = exprParser.longValue();
+                                    matchKeywords(Keywords.DAY);
+                                }
+                                break;
+                            default:
+                                throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                        }
+                        break;
+                    }
+                    default:
+                        throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                }
+                passwordOption = new Tuple3<>(type, isDefault, day);
+            } else {
+                matchKeywords(Keywords.ACCOUNT);
+                if (lexer.token() == Token.KW_LOCK) {
+                    lock = true;
+                    lexer.nextToken();
+                } else {
+                    match(Token.KW_UNLOCK);
+                    lock = false;
+                }
+            }
+        }
+        return new DALAlterUserStatement(ifExists, users, requireNone, tlsOptions, resourceOptions,
+            passwordOption, lock);
+    }
+
+    private SQLStatement alterTablespace(boolean undo) throws SQLSyntaxErrorException {
+        Identifier name = null;
+        boolean isAddFile = false;
+        LiteralString fileName = null;
+        Expression initialSize = null;
+        boolean isWait = false;
+        Identifier renameTo = null;
+        Boolean setActive = null;
+        Boolean encryption = null;
+        Identifier engine = null;
+        matchKeywords(Keywords.TABLESPACE);
+        name = identifier(false);
+        if (lexer.token() == Token.KW_RENAME) {
+            lexer.nextToken();
+            match(Token.KW_TO);
+            renameTo = identifier(false);
+        } else {
+            if (lexer.token() == Token.KW_ADD || lexer.token() == Token.KW_DROP) {
+                if (lexer.token() == Token.KW_ADD) {
+                    isAddFile = true;
+                }
+                lexer.nextToken();
+                matchKeywords(Keywords.DATAFILE);
+                fileName = exprParser.parseString();
+            } else if (lexer.token() == Token.KW_SET) {
+                if (!undo) {
+                    throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                }
+                lexer.nextToken();
+                if (lexer.token() == Token.IDENTIFIER) {
+                    int key = lexer.parseKeyword();
+                    if (key == Keywords.ACTIVE) {
+                        setActive = true;
+                    } else if (key == Keywords.INACTIVE) {
+                        setActive = false;
+                    } else {
+                        throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                    }
+                } else {
+                    throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                }
+                lexer.nextToken();
+            } else if (lexer.token() == Token.IDENTIFIER
+                && lexer.parseKeyword() == Keywords.ENCRYPTION) {
+                if (lexer.nextToken() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                LiteralString string = exprParser.parseString();
+                if (string != null) {
+                    byte[] result = BytesUtil.getValue(lexer.getSQL(), string.getString());
+                    if (result.length == 3) {
+                        byte v = result[1];
+                        if (v == 'Y' || v == 'y') {
+                            encryption = true;
+                        } else if (v == 'N' || v == 'n') {
+                            encryption = false;
+                        } else {
+                            throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                        }
+                    } else {
+                        throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                    }
+                }
+            }
+            if (lexer.token() == Token.IDENTIFIER
+                && lexer.parseKeyword() == Keywords.INITIAL_SIZE) {
+                if (lexer.nextToken() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                initialSize = exprParser.expression();
+            }
+            if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.WAIT) {
+                isWait = true;
+                lexer.nextToken();
+            }
+            if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.ENGINE) {
+                if (lexer.nextToken() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                engine = identifier(false);
+            }
+        }
+        return new DDLAlterTablespaceStatement(undo, name, isAddFile, fileName, initialSize, isWait,
+            renameTo, setActive, encryption, engine);
+    }
+
+    private SQLStatement alterServer() throws SQLSyntaxErrorException {
+        Identifier serverName = null;
+        List<Pair<Integer, Literal>> options = null;
+        matchKeywords(Keywords.SERVER);
+        serverName = identifier(false);
+        matchKeywords(Keywords.OPTIONS);
+        match(Token.PUNC_LEFT_PAREN);
+        options = new ArrayList<>();
+        Pair<Integer, Literal> option = serverOption();
+        options.add(option);
+        while (lexer.token() == Token.PUNC_COMMA) {
+            lexer.nextToken();
+            option = serverOption();
+            options.add(option);
+        }
+        match(Token.PUNC_RIGHT_PAREN);
+        return new DDLAlterServerStatement(serverName, options);
+    }
+
+    private SQLStatement alterResouceGroup() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        List<Expression> vcpus = null;
+        Long threadPriority = null;
+        Boolean enable = null;
+        boolean force = false;
+        matchKeywords(Keywords.RESOURCE);
+        match(Token.KW_GROUP);
+        name = identifier(false);
+        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.VCPU) {
+            if (lexer.nextToken() == Token.OP_EQUALS) {
+                lexer.nextToken();
+            }
+            vcpus = new ArrayList<>();
+            Expression vcpuSpec = exprParser.expression();
+            vcpus.add(vcpuSpec);
+            while (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+                vcpuSpec = exprParser.expression();
+                vcpus.add(vcpuSpec);
+            }
+        }
+        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.THREAD_PRIORITY) {
+            if (lexer.nextToken() == Token.OP_EQUALS) {
+                lexer.nextToken();
+            }
+            threadPriority = exprParser.longValue();
+        }
+        if (lexer.token() == Token.IDENTIFIER) {
+            int key = lexer.parseKeyword();
+            if (key == Keywords.ENABLE) {
+                enable = true;
+            } else if (key == Keywords.DISABLE) {
+                enable = false;
+                if (lexer.nextToken() == Token.KW_FORCE) {
+                    force = true;
+                    lexer.nextToken();
+                }
+            } else {
+                throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+            }
+        }
+        return new DALAlterResourceGroupStatement(name, vcpus, threadPriority, enable, force);
+    }
+
+    private SQLStatement alterProcedure() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        List<Characteristic> characteristics = null;
+        match(Token.KW_PROCEDURE);
+        name = identifier(false);
+        characteristics = new ArrayList<>();
+        Characteristic characteristic = getCharacteristics();
+        while (characteristic != null) {
+            characteristics.add(characteristic);
+            characteristic = getCharacteristics();
+        }
+        return new DDLAlterProcedureStatement(name, characteristics);
+    }
+
+    private SQLStatement alterLogfileGroup() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        LiteralString undoFile = null;
+        Expression initialSize = null;
+        boolean isWait = false;
+        Identifier engine = null;
+        matchKeywords(Keywords.LOGFILE);
+        match(Token.KW_GROUP);
+        name = identifier(false);
+        match(Token.KW_ADD);
+        matchKeywords(Keywords.UNDOFILE);
+        undoFile = exprParser.parseString();
+        while (lexer.token() != Token.PUNC_SEMICOLON && lexer.token() != Token.EOF) {
+            switch (lexer.token()) {
+                case Token.IDENTIFIER: {
+                    switch (lexer.parseKeyword()) {
+                        case Keywords.INITIAL_SIZE:
                             if (lexer.nextToken() == Token.OP_EQUALS) {
                                 lexer.nextToken();
                             }
-                            int intVal = lexer.integerValue().intValue();
-                            lexer.nextToken();
-                            if (intVal == 1) {
-                                partitionOptions.setAlgorithm(1);
-                            } else if (intVal == 2) {
-                                partitionOptions.setAlgorithm(2);
-                            }
-                        }
-                        match(Token.PUNC_LEFT_PAREN);
-                        List<Identifier> keyColumns = new ArrayList<>();
-                        keyColumns.add(identifier());
-                        for (; lexer.token() == Token.PUNC_COMMA; ) {
-                            lexer.nextToken();
-                            keyColumns.add(identifier());
-                        }
-                        partitionOptions.setKeyColumns(keyColumns);
-                        match(Token.PUNC_RIGHT_PAREN);
-                    }
-                    break;
-                case Token.KW_RANGE:
-                    if (lexer.nextToken() == Token.PUNC_LEFT_PAREN) {
-                        lexer.nextToken();
-                        partitionOptions.setRangeExpr(exprParser.expression());
-                        match(Token.PUNC_RIGHT_PAREN);
-                    } else if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.COLUMNS) {
-                        lexer.nextToken();
-                        match(Token.PUNC_LEFT_PAREN);
-                        List<Identifier> rangeColumns = new ArrayList<>();
-                        rangeColumns.add(identifier());
-                        for (; lexer.token() == Token.PUNC_COMMA; ) {
-                            lexer.nextToken();
-                            rangeColumns.add(identifier());
-                        }
-                        partitionOptions.setRangeColumns(rangeColumns);
-                        match(Token.PUNC_RIGHT_PAREN);
-                    }
-                    break;
-                case Token.IDENTIFIER:
-                    int key = lexer.parseKeyword();
-                    if (key == Keywords.LIST) {
-                        if (lexer.nextToken() == Token.PUNC_LEFT_PAREN) {
-                            lexer.nextToken();
-                            partitionOptions.setListExpr(exprParser.expression());
-                            match(Token.PUNC_RIGHT_PAREN);
-                        } else if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.COLUMNS) {
-                            lexer.nextToken();
-                            match(Token.PUNC_LEFT_PAREN);
-                            List<Identifier> listColumns = new ArrayList<>();
-                            listColumns.add(identifier());
-                            for (; lexer.token() == Token.PUNC_COMMA; ) {
-                                lexer.nextToken();
-                                listColumns.add(identifier());
-                            }
-                            partitionOptions.setListColumns(listColumns);
-                            match(Token.PUNC_RIGHT_PAREN);
-                        }
-                    } else if (key == Keywords.HASH) {
-                        lexer.nextToken();
-                        match(Token.PUNC_LEFT_PAREN);
-                        partitionOptions.setHash(exprParser.expression());
-                        match(Token.PUNC_RIGHT_PAREN);
-                    } else {
-                        throw new SQLSyntaxErrorException("unexpected SQL!");
-                    }
-                    break;
-                case Token.KW_KEY:
-                    lexer.nextToken();
-                    partitionOptions.setKey(true);
-                    if (lexer.parseKeyword() == Keywords.ALGORITHM) {
-                        if (lexer.nextToken() == Token.OP_EQUALS) {
-                            lexer.nextToken();
-                        }
-                        int intVal = lexer.integerValue().intValue();
-                        lexer.nextToken();
-                        if (intVal == 1) {
-                            partitionOptions.setAlgorithm(1);
-                        } else if (intVal == 2) {
-                            partitionOptions.setAlgorithm(2);
-                        }
-                    }
-                    match(Token.PUNC_LEFT_PAREN);
-                    if (lexer.token() == Token.IDENTIFIER) {
-                        List<Identifier> keyColumns = new ArrayList<>();
-                        keyColumns.add(identifier());
-                        for (; lexer.token() == Token.PUNC_COMMA; ) {
-                            lexer.nextToken();
-                            keyColumns.add(identifier());
-                        }
-                        partitionOptions.setKeyColumns(keyColumns);
-                    }
-                    match(Token.PUNC_RIGHT_PAREN);
-                    break;
-            }
-            if (lexer.token() == Token.IDENTIFIER) {
-                do {
-                    switch (lexer.parseKeyword()) {
-                        case Keywords.PARTITIONS:
-                            lexer.nextToken();
-                            partitionOptions.setPartitionNum(lexer.integerValue().longValue());
-                            lexer.nextToken();
+                            initialSize = exprParser.expression();
                             break;
-                        case Keywords.SUBPARTITION:
+                        case Keywords.WAIT:
                             lexer.nextToken();
-                            match(Token.KW_BY);
-                            if (lexer.token() == Token.KW_LINEAR) {
-                                lexer.nextToken();
-                                partitionOptions.setSubpartitionLiner(true);
-                                if (lexer.token() == Token.KW_KEY) {
-                                    lexer.nextToken();
-                                    partitionOptions.setSubpartitionKey(true);
-                                    if (lexer.parseKeyword() == Keywords.ALGORITHM) {
-                                        if (lexer.nextToken() == Token.OP_EQUALS) {
-                                            lexer.nextToken();
-                                        }
-                                        int intVal = lexer.integerValue().intValue();
-                                        lexer.nextToken();
-                                        if (intVal == 1) {
-                                            partitionOptions.setSubpartitionAlgorithm(1);
-                                        } else if (intVal == 2) {
-                                            partitionOptions.setSubpartitionAlgorithm(2);
-                                        }
-                                    }
-                                    match(Token.PUNC_LEFT_PAREN);
-                                    List<Identifier> subKeyColumns = new ArrayList<>();
-                                    subKeyColumns.add(identifier());
-                                    for (; lexer.token() == Token.PUNC_COMMA; ) {
-                                        lexer.nextToken();
-                                        subKeyColumns.add(identifier());
-                                    }
-                                    partitionOptions.setSubpartitionKeyColumns(subKeyColumns);
-                                    match(Token.PUNC_RIGHT_PAREN);
-                                } else if (lexer.parseKeyword() == Keywords.HASH) {
-                                    lexer.nextToken();
-                                    match(Token.PUNC_LEFT_PAREN);
-                                    partitionOptions.setSubpartitionHash(exprParser.expression());
-                                    match(Token.PUNC_RIGHT_PAREN);
-                                }
-                            } else if (lexer.token() == Token.KW_KEY) {
-                                lexer.nextToken();
-                                partitionOptions.setSubpartitionKey(true);
-                                if (lexer.parseKeyword() == Keywords.ALGORITHM) {
-                                    if (lexer.nextToken() == Token.OP_EQUALS) {
-                                        lexer.nextToken();
-                                    }
-                                    int intVal = lexer.integerValue().intValue();
-                                    lexer.nextToken();
-                                    if (intVal == 1) {
-                                        partitionOptions.setSubpartitionAlgorithm(1);
-                                    } else if (intVal == 2) {
-                                        partitionOptions.setSubpartitionAlgorithm(2);
-                                    }
-                                }
-                                match(Token.PUNC_LEFT_PAREN);
-                                List<Identifier> subKeyColumns = new ArrayList<>();
-                                subKeyColumns.add(identifier());
-                                for (; lexer.token() == Token.PUNC_COMMA; ) {
-                                    lexer.nextToken();
-                                    subKeyColumns.add(identifier());
-                                }
-                                partitionOptions.setSubpartitionKeyColumns(subKeyColumns);
-                                match(Token.PUNC_RIGHT_PAREN);
-                            } else if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.HASH) {
-                                lexer.nextToken();
-                                match(Token.PUNC_LEFT_PAREN);
-                                partitionOptions.setSubpartitionHash(exprParser.expression());
-                                match(Token.PUNC_RIGHT_PAREN);
-                            }
-                            if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.SUBPARTITIONS) {
-                                lexer.nextToken();
-                                partitionOptions.setSubpartitionNum(lexer.integerValue().longValue());
-                                lexer.nextToken();
-                            }
+                            isWait = true;
                             break;
+                        case Keywords.ENGINE:
+                            if (lexer.nextToken() == Token.OP_EQUALS) {
+                                lexer.nextToken();
+                            }
+                            engine = identifier(false);
+                            break;
+                        default:
+                            throw new SQLSyntaxErrorException("unexpected DDL SQL!");
                     }
-                } while (lexer.token() == Token.IDENTIFIER);
+                    break;
+                }
+                default:
+                    throw new SQLSyntaxErrorException("unexpected DDL SQL!");
             }
-            if (lexer.token() == Token.PUNC_LEFT_PAREN) {
-                List<PartitionDefinition> partitionDefinitions = partitionDefinition();
-                partitionOptions.setPartitionDefinitions(partitionDefinitions);
-            }
-            return partitionOptions;
         }
-        return null;
+        return new DDLAlterLogfileGroupStatement(name, undoFile, initialSize, isWait, engine);
+    }
+
+    private SQLStatement alterInstance() throws SQLSyntaxErrorException {
+        int type = 0;
+        matchKeywords(Keywords.INSTANCE);
+        if (lexer.token() == Token.IDENTIFIER) {
+            if (lexer.parseKeyword() == Keywords.ROTATE) {
+                if (lexer.nextToken() == Token.IDENTIFIER
+                    && lexer.parseKeyword() == Keywords.BINLOG) {
+                    lexer.nextToken();
+                    matchKeywords(Keywords.MASTER);
+                    match(Token.KW_KEY);
+                    type = DDLAlterInstanceStatement.ROTATE_BINLOG;
+                } else {
+                    matchIdentifier("INNODB");
+                    matchKeywords(Keywords.MASTER);
+                    match(Token.KW_KEY);
+                    type = DDLAlterInstanceStatement.ROTATE_INNODB;
+                }
+            } else {
+                matchKeywords(Keywords.RELOAD);
+                matchIdentifier("TLS");
+                if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.NO) {
+                    lexer.nextToken();
+                    matchKeywords(Keywords.ROLLBACK);
+                    match(Token.KW_ON);
+                    matchKeywords(Keywords.ERROR);
+                    type = DDLAlterInstanceStatement.RELOAD_TLS_NO;
+                } else {
+                    type = DDLAlterInstanceStatement.RELOAD_TLS;
+                }
+            }
+        } else {
+            throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+        }
+        return new DDLAlterInstanceStatement(type);
+    }
+
+    private SQLStatement alterEvent(Expression definer) throws SQLSyntaxErrorException {
+        Identifier event = null;
+        ScheduleDefinition schedule = null;
+        Boolean preserve = null;
+        Identifier renameTo = null;
+        Integer enableType = null;
+        LiteralString comment = null;
+        SQLStatement eventBody = null;
+        matchKeywords(Keywords.EVENT);
+        event = identifier(false);
+        while (lexer.token() != Token.PUNC_SEMICOLON && lexer.token() != Token.EOF) {
+            switch (lexer.token()) {
+                case Token.KW_ON:
+                    lexer.nextToken();
+                    break;
+                case Token.KW_RENAME:
+                    lexer.nextToken();
+                    match(Token.KW_TO);
+                    renameTo = identifier(false);
+                    break;
+                case Token.IDENTIFIER: {
+                    switch (lexer.parseKeyword()) {
+                        case Keywords.SCHEDULE:
+                            lexer.nextToken();
+                            schedule = scheduleDefinition();
+                            break;
+                        case Keywords.COMPLETION:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_NOT) {
+                                lexer.nextToken();
+                                preserve = false;
+                            } else {
+                                preserve = true;
+                            }
+                            matchKeywords(Keywords.PRESERVE);
+                            break;
+                        case Keywords.ENABLE:
+                            lexer.nextToken();
+                            enableType = DDLAlterEventStatement.ENABLE;
+                            break;
+                        case Keywords.DISABLE:
+                            if (lexer.nextToken() == Token.KW_ON) {
+                                lexer.nextToken();
+                                matchKeywords(Keywords.SLAVE);
+                                enableType = DDLAlterEventStatement.DISABLE_ON_SLAVE;
+                            } else {
+                                enableType = DDLAlterEventStatement.DISABLE;
+                            }
+                            break;
+                        case Keywords.COMMENT:
+                            lexer.nextToken();
+                            comment = exprParser.parseString();
+                            break;
+                        case Keywords.DO:
+                            lexer.nextToken();
+                            eventBody = Parser
+                                .parse(lexer).get(0);
+                            break;
+                    }
+                }
+            }
+        }
+        return new DDLAlterEventStatement(definer, event, schedule, preserve, renameTo, enableType,
+            comment, eventBody);
+    }
+
+    private SQLStatement alterFunction() throws SQLSyntaxErrorException {
+        match(Token.KW_FUNCTION);
+        Identifier name = null;
+        List<Characteristic> characteristics = new ArrayList<>();
+        name = identifier(false);
+        Characteristic Characteristic = getCharacteristics();
+        while (Characteristic != null) {
+            characteristics.add(Characteristic);
+            Characteristic = getCharacteristics();
+        }
+        return new DDLAlterFunctionStatement(name, characteristics);
+    }
+
+    private SQLStatement alterDatabase() throws SQLSyntaxErrorException {
+        match(Token.KW_DATABASE, Token.KW_SCHEMA);
+        Identifier db = null;
+        Identifier charset = null;
+        Identifier collate = null;
+        Boolean isEncryption = null;
+        db = identifier(false);
+        do {
+            if (lexer.token() == Token.KW_DEFAULT) {
+                lexer.nextToken();
+            }
+            if (lexer.token() == Token.KW_CHARACTER) {
+                lexer.nextToken();
+                match(Token.KW_SET);
+                if (lexer.token() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                charset = identifier(false);
+            } else if (lexer.token() == Token.KW_COLLATE) {
+                if (lexer.nextToken() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                collate = identifier(false);
+            } else if (lexer.token() == Token.IDENTIFIER
+                && lexer.parseKeyword() == Keywords.ENCRYPTION) {
+                if (lexer.nextToken() == Token.OP_EQUALS) {
+                    lexer.nextToken();
+                }
+                LiteralString encryption = exprParser.parseString();
+                if (encryption != null) {
+                    byte[] result = BytesUtil.getValue(lexer.getSQL(), encryption.getString());
+                    if (result.length == 3) {
+                        byte v = result[1];
+                        if (v == 'Y' || v == 'y') {
+                            isEncryption = true;
+                        } else if (v == 'N' || v == 'n') {
+                            isEncryption = false;
+                        } else {
+                            throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                        }
+                    } else {
+                        throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+                    }
+                }
+            } else {
+                throw new SQLSyntaxErrorException("unexpected DDL SQL!");
+            }
+        } while (lexer.token() != Token.PUNC_SEMICOLON && lexer.token() != Token.EOF);
+        return new DDLAlterDatabaseStatement(db, charset, collate, isEncryption);
+    }
+
+    private SQLStatement alterTable() throws SQLSyntaxErrorException {
+        match(Token.KW_TABLE);
+        Identifier name = identifier(true);
+        List<AlterSpecification> alters = alterSpecifications();
+        PartitionOptions partion = partionOptions();
+        return new DDLAlterTableStatement(name, alters, partion);
+    }
+
+    private List<AlterSpecification> alterSpecifications() throws SQLSyntaxErrorException {
+        List<AlterSpecification> alters = new ArrayList<>();
+        do {
+            TableOptions options = new TableOptions();
+            if (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+            }
+            if (tableOptions(options)) {
+                alters.add(options);
+            }
+            if (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+            }
+            switch (lexer.token()) {
+                case Token.KW_ADD:
+                    switch (lexer.nextToken()) {
+                        case Token.KW_COLUMN: {
+                            lexer.nextToken();
+                            if (lexer.token() == Token.PUNC_LEFT_PAREN) {
+                                addColumns(alters);
+                            } else {
+                                addColumn(alters);
+                            }
+                            break;
+                        }
+                        case Token.KW_PARTITION: {
+                            lexer.nextToken();
+                            addPartitionDefinition(alters);
+                            break;
+                        }
+                        case Token.KW_INDEX:
+                            lexer.nextToken();
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.INDEX, null)));
+                            break;
+                        case Token.KW_KEY:
+                            lexer.nextToken();
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.KEY, null)));
+                            break;
+                        case Token.KW_CONSTRAINT:
+                            lexer.nextToken();
+                            Identifier symbol = identifier();
+                            switch (lexer.token()) {
+                                case Token.KW_PRIMARY:
+                                    lexer.nextToken();
+                                    match(Token.KW_KEY);
+                                    alters.add(new AddKey(
+                                        indexDefinition(IndexDefinition.PRIMARY, symbol)));
+                                    break;
+                                case Token.KW_UNIQUE:
+                                    lexer.nextToken();
+                                    if (lexer.token() == Token.KW_KEY
+                                        || lexer.token() == Token.KW_INDEX) {
+                                        lexer.nextToken();
+                                    }
+                                    alters.add(new AddKey(
+                                        indexDefinition(IndexDefinition.UNIQUE, symbol)));
+                                    break;
+                                case Token.KW_FOREIGN:
+                                    lexer.nextToken();
+                                    match(Token.KW_KEY);
+                                    Identifier indexName = null;
+                                    if (lexer.token() == Token.IDENTIFIER) {
+                                        indexName = identifier();
+                                    }
+                                    alters.add(new AddForeignKey(
+                                        foreignKeyDefinition(symbol, indexName)));
+                                    break;
+                                case Token.KW_CHECK:
+                                    lexer.nextToken();
+                                    match(Token.PUNC_LEFT_PAREN);
+                                    Expression expr = exprParser.expression();
+                                    match(Token.PUNC_RIGHT_PAREN);
+                                    Boolean enforced = null;
+                                    if (lexer.token() == Token.KW_NOT) {
+                                        lexer.nextToken();
+                                        matchIdentifier("ENFORCED");
+                                        enforced = false;
+                                    } else if (lexer.token() == Token.IDENTIFIER) {
+                                        matchIdentifier("ENFORCED");
+                                        enforced = true;
+                                    }
+                                    Tuple3<Identifier, Expression, Boolean> checkConstraintDef =
+                                        new Tuple3<Identifier, Expression, Boolean>(symbol,
+                                            expr, enforced);
+                                    alters.add(
+                                        new AddCheckConstraintDefinition(checkConstraintDef));
+                                    break;
+                            }
+                            break;
+                        case Token.KW_PRIMARY:
+                            lexer.nextToken();
+                            match(Token.KW_KEY);
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.PRIMARY, null)));
+                            break;
+                        case Token.KW_UNIQUE:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_KEY || lexer.token() == Token.KW_INDEX) {
+                                lexer.nextToken();
+                            }
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.UNIQUE, null)));
+                            break;
+                        case Token.KW_FOREIGN:
+                            lexer.nextToken();
+                            match(Token.KW_KEY);
+                            Identifier indexName = null;
+                            if (lexer.token() == Token.IDENTIFIER) {
+                                indexName = identifier();
+                            }
+                            alters.add(new AddForeignKey(foreignKeyDefinition(null, indexName)));
+                            break;
+                        case Token.KW_FULLTEXT:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_KEY || lexer.token() == Token.KW_INDEX) {
+                                lexer.nextToken();
+                            }
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.FULLTEXT, null)));
+                            break;
+                        case Token.KW_SPATIAL:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_KEY || lexer.token() == Token.KW_INDEX) {
+                                lexer.nextToken();
+                            }
+                            alters.add(new AddKey(indexDefinition(IndexDefinition.SPATIAL, null)));
+                            break;
+                        case Token.PUNC_LEFT_PAREN:
+                            addColumns(alters);
+                            break;
+                        case Token.IDENTIFIER:
+                            addColumn(alters);
+                            break;
+                    }
+                    break;
+                case Token.KW_ALTER:
+                    lexer.nextToken();
+                    if (lexer.token() == Token.KW_INDEX) {
+                        lexer.nextToken();
+                        Identifier id = identifier();
+                        int i = matchKeywords(Keywords.VISIBLE, Keywords.INVISIBLE);
+                        alters.add(new AlterIndex(id, i == 0));
+                    } else if (lexer.token() == Token.KW_CHECK) {
+                        lexer.nextToken();
+                        Identifier symbol = identifier();
+                        boolean enforced = false;
+                        if (lexer.token() == Token.KW_NOT) {
+                            lexer.nextToken();
+                            matchIdentifier("ENFORCED");
+                            enforced = false;
+                        } else if (lexer.token() == Token.IDENTIFIER) {
+                            matchIdentifier("ENFORCED");
+                            enforced = true;
+                        }
+                        alters.add(new AlterCheckConstraintDefination(symbol, enforced));
+                    } else {
+                        if (lexer.token() == Token.KW_COLUMN) {
+                            lexer.nextToken();
+                        }
+                        Identifier col = identifier();
+                        if (lexer.token() == Token.KW_SET) {
+                            lexer.nextToken();
+                            match(Token.KW_DEFAULT);
+                            alters.add(
+                                new AlterColumn(col, false, (Literal) exprParser.expression()));
+                        } else {
+                            match(Token.KW_DROP);
+                            match(Token.KW_DEFAULT);
+                            alters.add(new AlterColumn(col, true, null));
+                        }
+                    }
+                    break;
+                case Token.KW_CHANGE:
+                    lexer.nextToken();
+                    if (lexer.token() == Token.KW_COLUMN) {
+                        lexer.nextToken();
+                    }
+                    changeColumn(alters);
+                    break;
+                case Token.KW_DEFAULT:
+                    lexer.nextToken();
+                case Token.KW_CHARACTER:
+                    lexer.nextToken();
+                    match(Token.KW_SET);
+                    Identifier character = identifier();
+                    if (lexer.token() == Token.KW_COLLATE) {
+                        lexer.nextToken();
+                        Identifier collate = identifier();
+                        alters.add(new ConvertCharacterSet(false, character, collate));
+                    } else {
+                        alters.add(new ConvertCharacterSet(false, character, null));
+                    }
+                    break;
+                case Token.KW_CONVERT:
+                    lexer.nextToken();
+                    match(Token.KW_TO);
+                    match(Token.KW_CHARACTER);
+                    match(Token.KW_SET);
+                    Identifier conCharacter = identifier();
+                    if (lexer.token() == Token.KW_COLLATE) {
+                        lexer.nextToken();
+                        Identifier collate = identifier();
+                        alters.add(new ConvertCharacterSet(true, conCharacter, collate));
+                    } else {
+                        alters.add(new ConvertCharacterSet(true, conCharacter, null));
+                    }
+                    break;
+                case Token.KW_DROP:
+                    lexer.nextToken();
+                    switch (lexer.token()) {
+                        case Token.KW_PARTITION:
+                            lexer.nextToken();
+                            List<Identifier> partitionsNames = new ArrayList<>();
+                            partitionsNames.add(identifier());
+                            for (; lexer.token() == Token.PUNC_COMMA;) {
+                                lexer.nextToken();
+                                partitionsNames.add(identifier());
+                            }
+                            alters.add(new PartitionOperation(PartitionOperation.DROP, null,
+                                partitionsNames, null, false, null, false, null));
+                            break;
+                        case Token.KW_CHECK:
+                            lexer.nextToken();
+                            Identifier symbol = identifier();
+                            alters.add(new DropCheckConstraintDefination(symbol));
+                            break;
+                        case Token.KW_COLUMN:
+                            lexer.nextToken();
+                        case Token.IDENTIFIER:
+                            Identifier name = identifier();
+                            alters.add(new DropColumn(name));
+                            break;
+                        case Token.KW_INDEX:
+                        case Token.KW_KEY:
+                            lexer.nextToken();
+                            Identifier index = identifier();
+                            alters.add(new DropIndex(index));
+                            break;
+                        case Token.KW_PRIMARY:
+                            lexer.nextToken();
+                            match(Token.KW_KEY);
+                            alters.add(new DropPrimaryKey());
+                            break;
+                        case Token.KW_FOREIGN:
+                            lexer.nextToken();
+                            match(Token.KW_KEY);
+                            Identifier foreignKey = identifier();
+                            alters.add(new DropForeignKey(foreignKey));
+                            break;
+                    }
+                    break;
+                case Token.KW_FORCE:
+                    lexer.nextToken();
+                    alters.add(new Force());
+                    break;
+                case Token.KW_ORDER:
+                    lexer.nextToken();
+                    match(Token.KW_BY);
+                    orderByColumns(alters);
+                    break;
+                case Token.KW_LOCK:
+                    if (lexer.nextToken() == Token.OP_EQUALS) {
+                        lexer.nextToken();
+                    }
+                    int lockType = 1;
+                    if (lexer.token() == Token.KW_DEFAULT) {
+                        lockType = Lock.DEFAULT;
+                    } else if (lexer.token() == Token.IDENTIFIER
+                        && lexer.parseKeyword() == Keywords.NONE) {
+                        lockType = Lock.NONE;
+                    } else {
+                        Identifier result = identifier();
+                        byte[] id = result.getIdText();
+                        if (BytesUtil.equalsIgnoreCase(id, "SHARED".getBytes())) {
+                            lockType = Lock.SHARED;
+                        } else if (BytesUtil.equalsIgnoreCase(id, "EXCLUSIVE".getBytes())) {
+                            lockType = Lock.EXCLUSIVE;
+                        }
+                    }
+                    alters.add(new Lock(lockType));
+                case Token.IDENTIFIER:
+                    switch (lexer.parseKeyword()) {
+                        case Keywords.WITHOUT:
+                            lexer.nextToken();
+                            matchKeywords(Keywords.VALIDATION);
+                            alters.add(new WithValidation(true));
+                            break;
+                        case Keywords.MODIFY:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_COLUMN) {
+                                lexer.nextToken();
+                            }
+                            modifyColumn(alters);
+                            break;
+                        case Keywords.ALGORITHM:
+                            if (lexer.nextToken() == Token.OP_EQUALS) {
+                                lexer.nextToken();
+                            }
+                            if (lexer.token() == Token.KW_DEFAULT) {
+                                alters.add(new Algorithm(Algorithm.DEFAULT));
+                            } else if (lexer.token() == Token.IDENTIFIER) {
+                                Identifier name = identifier();
+                                byte[] id = name.getIdText();
+                                if (BytesUtil.equalsIgnoreCase(id, "INSTANT".getBytes())) {
+                                    alters.add(new Algorithm(Algorithm.INSTANT));
+                                } else if (BytesUtil.equalsIgnoreCase(id, "INPLACE".getBytes())) {
+                                    alters.add(new Algorithm(Algorithm.INPLACE));
+                                } else if (BytesUtil.equalsIgnoreCase(id, "COPY".getBytes())) {
+                                    alters.add(new Algorithm(Algorithm.COPY));
+                                }
+                            }
+                            break;
+                        case Keywords.ENABLE:
+                            lexer.nextToken();
+                            match(Token.KW_KEYS);
+                            alters.add(new EnableKeys(true));
+                            break;
+                        case Keywords.DISABLE:
+                            lexer.nextToken();
+                            match(Token.KW_KEYS);
+                            alters.add(new EnableKeys(false));
+                            break;
+                        case Keywords.DISCARD:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_PARTITION) {
+                                if (lexer.nextToken() != Token.KW_ALL) {
+                                    List<Identifier> partitionsNames = new ArrayList<>();
+                                    partitionsNames.add(identifier());
+                                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                                        lexer.nextToken();
+                                        partitionsNames.add(identifier());
+                                    }
+                                    matchKeywords(Keywords.TABLESPACE);
+                                    alters.add(new PartitionOperation(PartitionOperation.DISCARD,
+                                        null, partitionsNames, null, false, null, null, null));
+                                } else {
+                                    match(Token.KW_ALL);
+                                    matchKeywords(Keywords.TABLESPACE);
+                                    alters.add(new PartitionOperation(PartitionOperation.DISCARD,
+                                        null, null, null, true, null, null, null));
+                                }
+                            } else {
+                                matchKeywords(Keywords.TABLESPACE);
+                                alters.add(new ImportTablespace(false));
+                            }
+                            break;
+                        case Keywords.IMPORT:
+                            lexer.nextToken();
+                            if (lexer.token() == Token.KW_PARTITION) {
+                                if (lexer.nextToken() != Token.KW_ALL) {
+                                    List<Identifier> partitionsNames = new ArrayList<>();
+                                    partitionsNames.add(identifier());
+                                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                                        lexer.nextToken();
+                                        partitionsNames.add(identifier());
+                                    }
+                                    matchKeywords(Keywords.TABLESPACE);
+                                    alters.add(new PartitionOperation(PartitionOperation.IMPORT,
+                                        null, partitionsNames, null, false, null, null, null));
+                                } else {
+                                    match(Token.KW_ALL);
+                                    matchKeywords(Keywords.TABLESPACE);
+                                    alters.add(new PartitionOperation(PartitionOperation.IMPORT,
+                                        null, null, null, true, null, null, null));
+                                }
+                            } else {
+                                matchKeywords(Keywords.TABLESPACE);
+                                alters.add(new ImportTablespace(true));
+                            }
+                            break;
+                        case Keywords.TRUNCATE:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            if (lexer.token() != Token.KW_ALL) {
+                                List<Identifier> partitionsNames = new ArrayList<>();
+                                partitionsNames.add(identifier());
+                                for (; lexer.token() == Token.PUNC_COMMA;) {
+                                    lexer.nextToken();
+                                    partitionsNames.add(identifier());
+                                }
+                                alters.add(new PartitionOperation(PartitionOperation.TRUNCATE, null,
+                                    partitionsNames, null, false, null, null, null));
+                            } else {
+                                match(Token.KW_ALL);
+                                alters.add(new PartitionOperation(PartitionOperation.TRUNCATE, null,
+                                    null, null, true, null, null, null));
+                            }
+                            break;
+                        case Keywords.COALESCE:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            LiteralNumber number = (LiteralNumber) exprParser.expression();
+                            alters.add(new PartitionOperation(PartitionOperation.COALESCE, null,
+                                null, null, true, null, null, number));
+                            break;
+                        case Keywords.REORGANIZE:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            List<Identifier> partitionsNames = new ArrayList<>();
+                            partitionsNames.add(identifier());
+                            for (; lexer.token() == Token.PUNC_COMMA;) {
+                                lexer.nextToken();
+                                partitionsNames.add(identifier());
+                            }
+                            match(Token.KW_INTO);
+                            reorganizePartitionDefinitions(alters);
+                            break;
+                        case Keywords.EXCHANGE:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            List<Identifier> partitionName = new ArrayList<>();
+                            partitionName.add(identifier());
+                            match(Token.KW_WITH);
+                            match(Token.KW_TABLE);
+                            Identifier tableName = identifier();
+                            boolean with = false;
+                            if (lexer.token() == Token.KW_WITH) {
+                                with = true;
+                                lexer.nextToken();
+                                matchKeywords(Keywords.VALIDATION);
+                            } else if (lexer.token() == Token.IDENTIFIER
+                                && lexer.parseKeyword() == Keywords.WITHOUT) {
+                                with = false;
+                                lexer.nextToken();
+                                matchKeywords(Keywords.VALIDATION);
+                            } else {
+                                throw new SQLSyntaxErrorException("unsupported DDL");
+                            }
+                            alters.add(new PartitionOperation(PartitionOperation.EXCHANGE, null,
+                                partitionName, null, false, tableName, with, null));
+                            break;
+                        case Keywords.REBUILD:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            if (lexer.token() != Token.KW_ALL) {
+                                partitionsNames = new ArrayList<>();
+                                partitionsNames.add(identifier());
+                                for (; lexer.token() == Token.PUNC_COMMA;) {
+                                    lexer.nextToken();
+                                    partitionsNames.add(identifier());
+                                }
+                                alters.add(new PartitionOperation(PartitionOperation.REBUILD, null,
+                                    partitionsNames, null, false, null, null, null));
+                            } else {
+                                match(Token.KW_ALL);
+                                alters.add(new PartitionOperation(PartitionOperation.REBUILD, null,
+                                    null, null, true, null, null, null));
+                            }
+                            break;
+                        case Keywords.REPAIR:
+                            lexer.nextToken();
+                            match(Token.KW_PARTITION);
+                            if (lexer.token() != Token.KW_ALL) {
+                                partitionsNames = new ArrayList<>();
+                                partitionsNames.add(identifier());
+                                for (; lexer.token() == Token.PUNC_COMMA;) {
+                                    lexer.nextToken();
+                                    partitionsNames.add(identifier());
+                                }
+                                alters.add(new PartitionOperation(PartitionOperation.REPAIR, null,
+                                    partitionsNames, null, false, null, null, null));
+                            } else {
+                                match(Token.KW_ALL);
+                                alters.add(new PartitionOperation(PartitionOperation.REPAIR, null,
+                                    null, null, true, null, null, null));
+                            }
+                            break;
+                        case Keywords.REMOVE:
+                            lexer.nextToken();
+                            matchKeywords(Keywords.PARTITIONING);
+                            alters.add(new PartitionOperation(PartitionOperation.REMOVE, null, null,
+                                null, false, null, null, null));
+                            break;
+                    }
+                    break;
+                case Token.KW_RENAME:
+                    lexer.nextToken();
+                    switch (lexer.token()) {
+                        case Token.KW_COLUMN:
+                            match(Token.KW_COLUMN);
+                            Identifier oldColumn = identifier();
+                            match(Token.KW_TO);
+                            Identifier newColumn = identifier();
+                            alters.add(new RenameColumn(oldColumn, newColumn));
+                            break;
+                        case Token.KW_INDEX:
+                        case Token.KW_KEY:
+                            lexer.nextToken();
+                            Identifier oldIndex = identifier();
+                            match(Token.KW_TO);
+                            Identifier newIndex = identifier();
+                            alters.add(new RenameIndex(oldIndex, newIndex));
+                            break;
+                        case Token.KW_TO:
+                        case Token.KW_AS:
+                            lexer.nextToken();
+                            Identifier newName = identifier();
+                            alters.add(new RenameTo(newName));
+                            break;
+                    }
+                    break;
+                case Token.KW_WITH:
+                    lexer.nextToken();
+                    matchKeywords(Keywords.VALIDATION);
+                    alters.add(new WithValidation(false));
+                    break;
+                case Token.KW_ANALYZE:
+                    lexer.nextToken();
+                    match(Token.KW_PARTITION);
+                    if (lexer.token() != Token.KW_ALL) {
+                        List<Identifier> partitionsNames = new ArrayList<>();
+                        partitionsNames.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            partitionsNames.add(identifier());
+                        }
+                        alters.add(new PartitionOperation(PartitionOperation.ANALYZE, null,
+                            partitionsNames, null, false, null, null, null));
+                    } else {
+                        match(Token.KW_ALL);
+                        alters.add(new PartitionOperation(PartitionOperation.ANALYZE, null, null,
+                            null, true, null, null, null));
+                    }
+                    break;
+                case Token.KW_CHECK:
+                    lexer.nextToken();
+                    match(Token.KW_PARTITION);
+                    if (lexer.token() != Token.KW_ALL) {
+                        List<Identifier> partitionsNames = new ArrayList<>();
+                        partitionsNames.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            partitionsNames.add(identifier());
+                        }
+                        alters.add(new PartitionOperation(PartitionOperation.CHECK, null,
+                            partitionsNames, null, false, null, null, null));
+                    } else {
+                        match(Token.KW_ALL);
+                        alters.add(new PartitionOperation(PartitionOperation.CHECK, null, null,
+                            null, true, null, null, null));
+                    }
+                    break;
+                case Token.KW_OPTIMIZE:
+                    lexer.nextToken();
+                    match(Token.KW_PARTITION);
+                    if (lexer.token() != Token.KW_ALL) {
+                        List<Identifier> partitionsNames = new ArrayList<>();
+                        partitionsNames.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            partitionsNames.add(identifier());
+                        }
+                        alters.add(new PartitionOperation(PartitionOperation.OPTIMIZE, null,
+                            partitionsNames, null, false, null, null, null));
+                    } else {
+                        match(Token.KW_ALL);
+                        alters.add(new PartitionOperation(PartitionOperation.OPTIMIZE, null, null,
+                            null, true, null, null, null));
+                    }
+                    break;
+            }
+        } while (lexer.token() == Token.PUNC_COMMA);
+        return alters.isEmpty() ? null : alters;
+    }
+
+    private void changeColumn(List<AlterSpecification> alters) throws SQLSyntaxErrorException {
+        Identifier oldCol = identifier();
+        Identifier newCol = identifier();
+        ColumnDefinition columnDefinition = columnDefinition();
+        Pair<Boolean, Identifier> first = null;
+        if (lexer.token() == Token.IDENTIFIER) {
+            int key = lexer.parseKeyword();
+            if (key == Keywords.AFTER) {
+                lexer.nextToken();
+                first = new Pair<Boolean, Identifier>(false, identifier());
+            } else {
+                matchKeywords(Keywords.FIRST);
+                first = new Pair<Boolean, Identifier>(true, null);
+            }
+        }
+        alters.add(new ChangeColumn(oldCol, newCol, columnDefinition, first));
+    }
+
+    private void modifyColumn(List<AlterSpecification> alters) throws SQLSyntaxErrorException {
+        Identifier name = identifier();
+        ColumnDefinition columnDefinition = columnDefinition();
+        Pair<Boolean, Identifier> first = null;
+        if (lexer.token() == Token.IDENTIFIER) {
+            int key = lexer.parseKeyword();
+            if (key == Keywords.AFTER) {
+                lexer.nextToken();
+                first = new Pair<Boolean, Identifier>(false, identifier());
+            } else {
+                matchKeywords(Keywords.FIRST);
+                first = new Pair<Boolean, Identifier>(true, null);
+            }
+        }
+        alters.add(new ModifyColumn(name, columnDefinition, first));
+    }
+
+    private void orderByColumns(List<AlterSpecification> alters) throws SQLSyntaxErrorException {
+        List<Identifier> columns = new ArrayList<>();
+        do {
+            if (lexer.token() == Token.PUNC_COMMA) {
+                lexer.nextToken();
+            }
+            Identifier column = identifier();
+            columns.add(column);
+        } while (lexer.token() == Token.PUNC_COMMA);
+        lexer.nextToken();
+        alters.add(new OrderByColumns(columns));
+    }
+
+    private void addColumn(List<AlterSpecification> alters) throws SQLSyntaxErrorException {
+        List<Pair<Identifier, ColumnDefinition>> columns = new ArrayList<>();
+        columns.add(new Pair<Identifier, ColumnDefinition>(identifier(), columnDefinition()));
+        Pair<Boolean, Identifier> first = null;
+        if (lexer.token() == Token.IDENTIFIER) {
+            int key = lexer.parseKeyword();
+            if (key == Keywords.AFTER) {
+                lexer.nextToken();
+                first = new Pair<Boolean, Identifier>(false, identifier());
+            } else {
+                matchKeywords(Keywords.FIRST);
+                first = new Pair<Boolean, Identifier>(true, null);
+            }
+        }
+        alters.add(new AddColumn(first, columns));
+    }
+
+    private void addPartitionDefinition(List<AlterSpecification> alters)
+        throws SQLSyntaxErrorException {
+        PartitionDefinition partitionDefinition = partitionDefinition().get(0);
+        alters.add(new PartitionOperation(PartitionOperation.ADD, partitionDefinition, null, null,
+            false, null, false, null));
+    }
+
+
+    private void addColumns(List<AlterSpecification> alters) throws SQLSyntaxErrorException {
+        List<Pair<Identifier, ColumnDefinition>> columns = new ArrayList<>();
+        boolean needMatch = false;
+        while (lexer.token() != Token.PUNC_RIGHT_PAREN) {
+            if (needMatch) {
+                match(Token.PUNC_COMMA);
+            } else {
+                needMatch = true;
+            }
+            columns.add(new Pair<Identifier, ColumnDefinition>(identifier(), columnDefinition()));
+        }
+        lexer.nextToken();
+        alters.add(new AddColumn(null, columns));
     }
 
     private void createDefinitions(DDLCreateTableStatement stmt) throws SQLSyntaxErrorException {
@@ -3428,4 +4573,223 @@ public class MySQLDDLParser extends AbstractParser {
             storage, referenceDefinition, as, virtual, stored, onUpdate, checkConstraintDef);
     }
 
+
+    private void reorganizePartitionDefinitions(List<AlterSpecification> alters)
+        throws SQLSyntaxErrorException {
+        List<PartitionDefinition> partitionDefinitions = partitionDefinition();
+        alters.add(new PartitionOperation(PartitionOperation.REORGANIZE, null, null,
+            partitionDefinitions, false, null, false, null));
+    }
+
+    public PartitionOptions partionOptions() throws SQLSyntaxErrorException {
+        PartitionOptions partitionOptions = new PartitionOptions();
+        if (lexer.token() == Token.KW_PARTITION) {
+            lexer.nextToken();
+            match(Token.KW_BY);
+            switch (lexer.token()) {
+                case Token.KW_LINEAR:
+                    lexer.nextToken();
+                    partitionOptions.setLiner(true);
+                    if (lexer.parseKeyword() == Keywords.HASH) {
+                        lexer.nextToken();
+                        match(Token.PUNC_LEFT_PAREN);
+                        partitionOptions.setHash(exprParser.expression());
+                        match(Token.PUNC_RIGHT_PAREN);
+                    } else if (lexer.token() == Token.KW_KEY) {
+                        lexer.nextToken();
+                        partitionOptions.setKey(true);
+                        if (lexer.token() == Token.IDENTIFIER
+                            && lexer.parseKeyword() == Keywords.ALGORITHM) {
+                            if (lexer.nextToken() == Token.OP_EQUALS) {
+                                lexer.nextToken();
+                            }
+                            int intVal = lexer.integerValue().intValue();
+                            lexer.nextToken();
+                            if (intVal == 1) {
+                                partitionOptions.setAlgorithm(1);
+                            } else if (intVal == 2) {
+                                partitionOptions.setAlgorithm(2);
+                            }
+                        }
+                        match(Token.PUNC_LEFT_PAREN);
+                        List<Identifier> keyColumns = new ArrayList<>();
+                        keyColumns.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            keyColumns.add(identifier());
+                        }
+                        partitionOptions.setKeyColumns(keyColumns);
+                        match(Token.PUNC_RIGHT_PAREN);
+                    }
+                    break;
+                case Token.KW_RANGE:
+                    if (lexer.nextToken() == Token.PUNC_LEFT_PAREN) {
+                        lexer.nextToken();
+                        partitionOptions.setRangeExpr(exprParser.expression());
+                        match(Token.PUNC_RIGHT_PAREN);
+                    } else if (lexer.token() == Token.IDENTIFIER
+                        && lexer.parseKeyword() == Keywords.COLUMNS) {
+                        lexer.nextToken();
+                        match(Token.PUNC_LEFT_PAREN);
+                        List<Identifier> rangeColumns = new ArrayList<>();
+                        rangeColumns.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            rangeColumns.add(identifier());
+                        }
+                        partitionOptions.setRangeColumns(rangeColumns);
+                        match(Token.PUNC_RIGHT_PAREN);
+                    }
+                    break;
+                case Token.IDENTIFIER:
+                    int key = lexer.parseKeyword();
+                    if (key == Keywords.LIST) {
+                        if (lexer.nextToken() == Token.PUNC_LEFT_PAREN) {
+                            lexer.nextToken();
+                            partitionOptions.setListExpr(exprParser.expression());
+                            match(Token.PUNC_RIGHT_PAREN);
+                        } else if (lexer.token() == Token.IDENTIFIER
+                            && lexer.parseKeyword() == Keywords.COLUMNS) {
+                            lexer.nextToken();
+                            match(Token.PUNC_LEFT_PAREN);
+                            List<Identifier> listColumns = new ArrayList<>();
+                            listColumns.add(identifier());
+                            for (; lexer.token() == Token.PUNC_COMMA;) {
+                                lexer.nextToken();
+                                listColumns.add(identifier());
+                            }
+                            partitionOptions.setListColumns(listColumns);
+                            match(Token.PUNC_RIGHT_PAREN);
+                        }
+                    } else if (key == Keywords.HASH) {
+                        lexer.nextToken();
+                        match(Token.PUNC_LEFT_PAREN);
+                        partitionOptions.setHash(exprParser.expression());
+                        match(Token.PUNC_RIGHT_PAREN);
+                    } else {
+                        throw new SQLSyntaxErrorException("unexpected SQL!");
+                    }
+                    break;
+                case Token.KW_KEY:
+                    lexer.nextToken();
+                    partitionOptions.setKey(true);
+                    if (lexer.parseKeyword() == Keywords.ALGORITHM) {
+                        if (lexer.nextToken() == Token.OP_EQUALS) {
+                            lexer.nextToken();
+                        }
+                        int intVal = lexer.integerValue().intValue();
+                        lexer.nextToken();
+                        if (intVal == 1) {
+                            partitionOptions.setAlgorithm(1);
+                        } else if (intVal == 2) {
+                            partitionOptions.setAlgorithm(2);
+                        }
+                    }
+                    match(Token.PUNC_LEFT_PAREN);
+                    if (lexer.token() == Token.IDENTIFIER) {
+                        List<Identifier> keyColumns = new ArrayList<>();
+                        keyColumns.add(identifier());
+                        for (; lexer.token() == Token.PUNC_COMMA;) {
+                            lexer.nextToken();
+                            keyColumns.add(identifier());
+                        }
+                        partitionOptions.setKeyColumns(keyColumns);
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                    break;
+            }
+            if (lexer.token() == Token.IDENTIFIER) {
+                do {
+                    switch (lexer.parseKeyword()) {
+                        case Keywords.PARTITIONS:
+                            lexer.nextToken();
+                            partitionOptions.setPartitionNum(lexer.integerValue().longValue());
+                            lexer.nextToken();
+                            break;
+                        case Keywords.SUBPARTITION:
+                            lexer.nextToken();
+                            match(Token.KW_BY);
+                            if (lexer.token() == Token.KW_LINEAR) {
+                                lexer.nextToken();
+                                partitionOptions.setSubpartitionLiner(true);
+                                if (lexer.token() == Token.KW_KEY) {
+                                    lexer.nextToken();
+                                    partitionOptions.setSubpartitionKey(true);
+                                    if (lexer.parseKeyword() == Keywords.ALGORITHM) {
+                                        if (lexer.nextToken() == Token.OP_EQUALS) {
+                                            lexer.nextToken();
+                                        }
+                                        int intVal = lexer.integerValue().intValue();
+                                        lexer.nextToken();
+                                        if (intVal == 1) {
+                                            partitionOptions.setSubpartitionAlgorithm(1);
+                                        } else if (intVal == 2) {
+                                            partitionOptions.setSubpartitionAlgorithm(2);
+                                        }
+                                    }
+                                    match(Token.PUNC_LEFT_PAREN);
+                                    List<Identifier> subKeyColumns = new ArrayList<>();
+                                    subKeyColumns.add(identifier());
+                                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                                        lexer.nextToken();
+                                        subKeyColumns.add(identifier());
+                                    }
+                                    partitionOptions.setSubpartitionKeyColumns(subKeyColumns);
+                                    match(Token.PUNC_RIGHT_PAREN);
+                                } else if (lexer.parseKeyword() == Keywords.HASH) {
+                                    lexer.nextToken();
+                                    match(Token.PUNC_LEFT_PAREN);
+                                    partitionOptions.setSubpartitionHash(exprParser.expression());
+                                    match(Token.PUNC_RIGHT_PAREN);
+                                }
+                            } else if (lexer.token() == Token.KW_KEY) {
+                                lexer.nextToken();
+                                partitionOptions.setSubpartitionKey(true);
+                                if (lexer.parseKeyword() == Keywords.ALGORITHM) {
+                                    if (lexer.nextToken() == Token.OP_EQUALS) {
+                                        lexer.nextToken();
+                                    }
+                                    int intVal = lexer.integerValue().intValue();
+                                    lexer.nextToken();
+                                    if (intVal == 1) {
+                                        partitionOptions.setSubpartitionAlgorithm(1);
+                                    } else if (intVal == 2) {
+                                        partitionOptions.setSubpartitionAlgorithm(2);
+                                    }
+                                }
+                                match(Token.PUNC_LEFT_PAREN);
+                                List<Identifier> subKeyColumns = new ArrayList<>();
+                                subKeyColumns.add(identifier());
+                                for (; lexer.token() == Token.PUNC_COMMA;) {
+                                    lexer.nextToken();
+                                    subKeyColumns.add(identifier());
+                                }
+                                partitionOptions.setSubpartitionKeyColumns(subKeyColumns);
+                                match(Token.PUNC_RIGHT_PAREN);
+                            } else if (lexer.token() == Token.IDENTIFIER
+                                && lexer.parseKeyword() == Keywords.HASH) {
+                                lexer.nextToken();
+                                match(Token.PUNC_LEFT_PAREN);
+                                partitionOptions.setSubpartitionHash(exprParser.expression());
+                                match(Token.PUNC_RIGHT_PAREN);
+                            }
+                            if (lexer.token() == Token.IDENTIFIER
+                                && lexer.parseKeyword() == Keywords.SUBPARTITIONS) {
+                                lexer.nextToken();
+                                partitionOptions
+                                    .setSubpartitionNum(lexer.integerValue().longValue());
+                                lexer.nextToken();
+                            }
+                            break;
+                    }
+                } while (lexer.token() == Token.IDENTIFIER);
+            }
+            if (lexer.token() == Token.PUNC_LEFT_PAREN) {
+                List<PartitionDefinition> partitionDefinitions = partitionDefinition();
+                partitionOptions.setPartitionDefinitions(partitionDefinitions);
+            }
+            return partitionOptions;
+        }
+        return null;
+    }
 }

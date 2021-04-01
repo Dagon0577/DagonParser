@@ -7,7 +7,8 @@ import java.io.Serializable;
  * @date 2020/7/14
  */
 public final class Pair<K, V> implements Cloneable, Serializable {
-    private static final long serialVersionUID = -5702964649113540425L;
+
+    private static final long serialVersionUID = -987745803348081872L;
 
     private K key;
     private V value;

@@ -1,4 +1,4 @@
-package parser.ast.stmt.ddl;
+package parser.ast.stmt.ddl.alter;
 
 import parser.SQLType;
 import parser.ast.expression.primary.Identifier;
@@ -6,38 +6,37 @@ import parser.ast.expression.primary.literal.Literal;
 import parser.ast.stmt.SQLStatement;
 import parser.util.Pair;
 import parser.visitor.Visitor;
-
 import java.util.List;
 
 /**
+ * 
  * @author Dagon0577
- * @date 2020/7/17
+ * @date 2021年04月01日
+ * 
+ *       <pre>
+ * ALTER SERVER  server_name
+ *     OPTIONS (option [, option] ...)
+ * option:
+ *  { HOST character-literal
+ *  | DATABASE character-literal
+ *  | USER character-literal
+ *  | PASSWORD character-literal
+ *  | SOCKET character-literal
+ *  | OWNER character-literal
+ *  | PORT numeric-literal }
+ *       </pre>
  */
-public class DDLCreateServerStatement implements SQLStatement {
-    public static final int HOST = 1;
-    public static final int DATABASE = 2;
-    public static final int USER = 3;
-    public static final int PASSWORD = 4;
-    public static final int SOCKET = 5;
-    public static final int OWNER = 6;
-    public static final int PORT = 7;
+public class DDLAlterServerStatement implements SQLStatement {
     private final Identifier serverName;
-    private final Identifier wrapperName;
     private final List<Pair<Integer, Literal>> options;
 
-    public DDLCreateServerStatement(Identifier serverName, Identifier wrapperName,
-        List<Pair<Integer, Literal>> options) {
+    public DDLAlterServerStatement(Identifier serverName, List<Pair<Integer, Literal>> options) {
         this.serverName = serverName;
-        this.wrapperName = wrapperName;
         this.options = options;
     }
 
     public Identifier getServerName() {
         return serverName;
-    }
-
-    public Identifier getWrapperName() {
-        return wrapperName;
     }
 
     public List<Pair<Integer, Literal>> getOptions() {
@@ -51,7 +50,6 @@ public class DDLCreateServerStatement implements SQLStatement {
 
     @Override
     public int getSQLType() {
-        return SQLType.CREATE_SERVER;
+        return SQLType.ALTER_SERVER;
     }
-
 }

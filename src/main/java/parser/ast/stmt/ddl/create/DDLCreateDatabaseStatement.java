@@ -1,4 +1,4 @@
-package parser.ast.stmt.ddl;
+package parser.ast.stmt.ddl.create;
 
 import parser.SQLType;
 import parser.ast.expression.primary.Identifier;

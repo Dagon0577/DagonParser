@@ -1,4 +1,4 @@
-package parser.ast.stmt.ddl.alter;
+package parser.ast.fragment.ddl.alter.interfaces;
 
 import parser.ast.AST;
 

@@ -1,4 +1,4 @@
-package parser.ast.stmt.ddl;
+package parser.ast.stmt.ddl.create;
 
 import parser.SQLType;
 import parser.ast.expression.Expression;
@@ -6,6 +6,8 @@ import parser.ast.expression.QueryExpression;
 import parser.ast.expression.primary.Identifier;
 import parser.ast.fragment.ddl.*;
 import parser.ast.stmt.SQLStatement;
+import parser.ast.fragment.ddl.ForeignKeyDefinition;
+import parser.ast.fragment.ddl.TableOptions;
 import parser.util.Pair;
 import parser.visitor.Visitor;
 
