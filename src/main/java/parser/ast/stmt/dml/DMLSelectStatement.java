@@ -51,6 +51,9 @@ import java.util.List;
  *       </pre>
  */
 public class DMLSelectStatement extends DMLQueryStatement {
+
+    private static final long serialVersionUID = -8798983474962473994L;
+
     public static final class SelectOption implements AST {
         public static final int UNDEF = 0;
         public static final int DUP_STRATEGY_ALL = 1;
@@ -60,6 +63,7 @@ public class DMLSelectStatement extends DMLQueryStatement {
         public static final int CACHE_STRATEGY_SQL_CACHE = 2;
         public static final int SQL_SMALL_RESULT = 1;
         public static final int SQL_BIG_RESULT = 2;
+        private static final long serialVersionUID = -4100799179517155473L;
 
         public Integer version;
         public int dupStrategy = DUP_STRATEGY_ALL;

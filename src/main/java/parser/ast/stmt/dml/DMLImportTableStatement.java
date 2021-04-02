@@ -16,6 +16,8 @@ import java.util.List;
  *       </pre>
  */
 public class DMLImportTableStatement implements DMLStatement {
+
+    private static final long serialVersionUID = -5901977704984443859L;
     private long parseInfo;
     private final List<LiteralString> files;
 

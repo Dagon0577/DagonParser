@@ -15,6 +15,8 @@ import java.util.List;
  * @date 2020/7/15
  */
 public class DMLSelectUnionStatement extends DMLQueryStatement {
+
+    private static final long serialVersionUID = 3493766948964032351L;
     private final List<DMLSelectStatement> selects;
     private int firstDistinctIndex = 0;
     private OrderBy orderBy;

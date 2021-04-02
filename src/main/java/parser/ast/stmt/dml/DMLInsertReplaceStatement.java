@@ -17,6 +17,8 @@ import java.util.List;
  * @date 2020/7/17
  */
 public class DMLInsertReplaceStatement implements DMLStatement {
+
+    private static final long serialVersionUID = 2806635212490911316L;
     private long parseInfo;
     public static final int UNDEF = 1;
     public static final int LOW = 2;

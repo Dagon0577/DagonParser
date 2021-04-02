@@ -43,6 +43,8 @@ import parser.ast.stmt.compound.cursors.CursorDeclareStatement;
 import parser.ast.stmt.compound.cursors.CursorFetchStatement;
 import parser.ast.stmt.compound.cursors.CursorOpenStatement;
 import parser.ast.stmt.compound.flowcontrol.*;
+import parser.ast.stmt.dal.DALLoadIndexIntoCacheStatement;
+import parser.ast.stmt.dal.DALLoadIndexIntoCacheStatement.TableIndexList;
 import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
 import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
@@ -381,4 +383,12 @@ public interface Visitor {
     public void visit(DMLHandlerStatement node);
 
     public void visit(DMLImportTableStatement node);
+
+    public void visit(DMLLoadDataInFileStatement node);
+
+    public void visit(DMLLoadXMLStatement node);
+
+    public void visit(DALLoadIndexIntoCacheStatement node);
+
+    public void visit(TableIndexList node);
 }

@@ -21,6 +21,8 @@ import java.util.List;
  * @date 2020/7/17
  */
 public class DMLDeleteStatement implements DMLStatement {
+
+    private static final long serialVersionUID = 1103635548388442285L;
     private long parseInfo;
     private final boolean lowPriority;
     private final boolean quick;

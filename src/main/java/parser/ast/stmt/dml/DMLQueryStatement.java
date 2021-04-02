@@ -14,6 +14,8 @@ import java.util.Map;
  * @date 2020/7/14
  */
 public abstract class DMLQueryStatement implements QueryExpression, DMLStatement {
+
+    private static final long serialVersionUID = -3710789524619751406L;
     protected WithClause with;
     protected boolean inParentheses;
 

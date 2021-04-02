@@ -20,6 +20,8 @@ import java.util.List;
  * @date 2020/7/17
  */
 public class DMLUpdateStatement implements DMLStatement {
+
+    private static final long serialVersionUID = -7363922479326284180L;
     private long parseInfo;
     private final boolean lowPriority;
     private final boolean ignore;

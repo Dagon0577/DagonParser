@@ -17,6 +17,8 @@ import java.util.List;
  *       </pre>
  */
 public class DMLDoStatement implements DMLStatement {
+
+    private static final long serialVersionUID = -1675718070848399010L;
     private long parseInfo;
     private final List<Expression> exprs;
 

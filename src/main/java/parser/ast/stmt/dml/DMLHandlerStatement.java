@@ -28,6 +28,8 @@ import java.util.List;
  *       </pre>
  */
 public class DMLHandlerStatement implements DMLStatement {
+
+    private static final long serialVersionUID = 4847294870377031911L;
     private long parseInfo;
     public static final int OPEN = 1;
     public static final int READ = 2;

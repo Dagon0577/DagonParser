@@ -1,6 +1,7 @@
 package parser.syntax;
 
 import parser.ParseInfo;
+import parser.ast.expression.ComparisionExpression;
 import parser.ast.expression.Expression;
 import parser.ast.expression.QueryExpression;
 import parser.ast.expression.primary.Identifier;
@@ -13,6 +14,8 @@ import parser.ast.fragment.GroupBy;
 import parser.ast.fragment.Limit;
 import parser.ast.fragment.OrderBy;
 import parser.ast.fragment.tableref.*;
+import parser.ast.stmt.SQLStatement;
+import parser.ast.stmt.dal.DALLoadIndexIntoCacheStatement;
 import parser.ast.stmt.dml.*;
 import parser.lexer.Lexer;
 import parser.token.Keywords;
@@ -589,6 +592,271 @@ public class MySQLDMLParser extends AbstractParser {
         }
         return new DMLImportTableStatement(files);
     }
+
+    public SQLStatement load() throws SQLSyntaxErrorException {
+        match(Token.KW_LOAD);
+        if (lexer.token() == Token.IDENTIFIER) {
+            int key = lexer.parseKeyword();
+            if (key == Keywords.DATA) {
+                lexer.nextToken();
+                Integer priority = null;
+                if (lexer.token() == Token.KW_LOW_PRIORITY) {
+                    lexer.nextToken();
+                    priority = DMLLoadDataInFileStatement.LOW_PRIORITY;
+                } else if (lexer.token() == Token.IDENTIFIER
+                    && equalsKeyword(Keywords.CONCURRENT)) {
+                    lexer.nextToken();
+                    priority = DMLLoadDataInFileStatement.CONCURRENT;
+                }
+                Boolean isLocal = null;
+                if (lexer.token() == Token.IDENTIFIER && equalsKeyword(Keywords.LOCAL)) {
+                    isLocal = true;
+                    lexer.nextToken();
+                }
+                match(Token.KW_INFILE);
+                LiteralString fileName = exprParser.parseString();
+                Integer insertType = null;
+                if (lexer.token() == Token.KW_REPLACE) {
+                    lexer.nextToken();
+                    insertType = DMLLoadDataInFileStatement.REPLACE;
+                } else if (lexer.token() == Token.KW_IGNORE) {
+                    lexer.nextToken();
+                    insertType = DMLLoadDataInFileStatement.IGNORE;
+                }
+                match(Token.KW_INTO);
+                match(Token.KW_TABLE);
+                Identifier table = identifier(true);
+                List<Identifier> partition = null;
+                if (lexer.token() == Token.KW_PARTITION) {
+                    lexer.nextToken();
+                    match(Token.PUNC_LEFT_PAREN);
+                    partition = new ArrayList<>();
+                    Identifier part = identifier();
+                    partition.add(part);
+                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                        lexer.nextToken();
+                        part = identifier();
+                        partition.add(part);
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                }
+                Identifier charset = null;
+                if (lexer.token() == Token.KW_CHARACTER) {
+                    lexer.nextToken();
+                    match(Token.KW_SET);
+                    charset = identifier();
+                }
+                LiteralString fieldsTerminatedBy = null;
+                LiteralString fieldsEnclosedBy = null;
+                LiteralString fieldsEscapedBy = null;
+                LiteralString linesStartingBy = null;
+                LiteralString linesTerminatedBy = null;
+                if (lexer.token() == Token.IDENTIFIER) {
+                    key = lexer.parseKeyword();
+                    if (key == Keywords.FIELDS || key == Keywords.COLUMNS) {
+                        lexer.nextToken();
+                        if (lexer.token() == Token.KW_TERMINATED) {
+                            lexer.nextToken();
+                            match(Token.KW_BY);
+                            fieldsTerminatedBy = exprParser.parseString();
+                        } else if (lexer.token() == Token.KW_ESCAPED) {
+                            lexer.nextToken();
+                            match(Token.KW_BY);
+                            fieldsEscapedBy = exprParser.parseString();
+                        } else if (lexer.token() == Token.KW_OPTIONALLY) {
+                            lexer.nextToken();
+                            match(Token.KW_ENCLOSED);
+                            match(Token.KW_BY);
+                            fieldsEnclosedBy = exprParser.parseString();
+                        } else if (lexer.token() == Token.KW_ENCLOSED) {
+                            lexer.nextToken();
+                            match(Token.KW_BY);
+                            fieldsEnclosedBy = exprParser.parseString();
+                        }
+                    }
+                }
+                if (lexer.token() == Token.KW_LINES) {
+                    lexer.nextToken();
+                    if (lexer.token() == Token.KW_STARTING) {
+                        lexer.nextToken();
+                        match(Token.KW_BY);
+                        linesStartingBy = exprParser.parseString();
+                    } else if (lexer.token() == Token.KW_TERMINATED) {
+                        lexer.nextToken();
+                        match(Token.KW_BY);
+                        linesTerminatedBy = exprParser.parseString();
+                    }
+                }
+                Long ignoreLine = null;
+                if (lexer.token() == Token.KW_IGNORE) {
+                    lexer.nextToken();
+                    ignoreLine = exprParser.longValue();
+                    match(Token.KW_LINES, Token.KW_ROWS);
+                }
+                List<Expression> columns = null;
+                if (lexer.token() == Token.PUNC_LEFT_PAREN) {
+                    lexer.nextToken();
+                    columns = new ArrayList<>();
+                    Expression expr = exprParser.expression();
+                    columns.add(expr);
+                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                        lexer.nextToken();
+                        expr = exprParser.expression();
+                        columns.add(expr);
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                }
+                List<ComparisionExpression> values = null;
+                if (lexer.token() == Token.KW_SET) {
+                    lexer.nextToken();
+                    values = new ArrayList<>();
+                    ComparisionExpression expr = loadComparisionExpression();
+                    values.add(expr);
+                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                        lexer.nextToken();
+                        expr = loadComparisionExpression();
+                        values.add(expr);
+                    }
+                }
+                return new DMLLoadDataInFileStatement(priority, isLocal, fileName, insertType,
+                    table, partition, charset, fieldsTerminatedBy, fieldsEnclosedBy,
+                    fieldsEscapedBy, linesStartingBy, linesTerminatedBy, ignoreLine, columns,
+                    values);
+            } else if (key == Keywords.XML) {
+                lexer.nextToken();
+                Integer priority = null;
+                if (lexer.token() == Token.KW_LOW_PRIORITY) {
+                    lexer.nextToken();
+                    priority = DMLLoadDataInFileStatement.LOW_PRIORITY;
+                } else if (lexer.token() == Token.IDENTIFIER
+                    && equalsKeyword(Keywords.CONCURRENT)) {
+                    lexer.nextToken();
+                    priority = DMLLoadDataInFileStatement.CONCURRENT;
+                }
+                Boolean isLocal = null;
+                if (lexer.token() == Token.IDENTIFIER && equalsKeyword(Keywords.LOCAL)) {
+                    isLocal = true;
+                    lexer.nextToken();
+                }
+                match(Token.KW_INFILE);
+                LiteralString fileName = exprParser.parseString();
+                Integer insertType = null;
+                if (lexer.token() == Token.KW_REPLACE) {
+                    lexer.nextToken();
+                    insertType = DMLLoadDataInFileStatement.REPLACE;
+                } else if (lexer.token() == Token.KW_IGNORE) {
+                    lexer.nextToken();
+                    insertType = DMLLoadDataInFileStatement.IGNORE;
+                }
+                match(Token.KW_INTO);
+                match(Token.KW_TABLE);
+                Identifier table = identifier(true);
+                Identifier charset = null;
+                if (lexer.token() == Token.KW_CHARACTER) {
+                    lexer.nextToken();
+                    match(Token.KW_SET);
+                    charset = identifier();
+                }
+                LiteralString identified = null;
+                if (lexer.token() == Token.KW_ROWS) {
+                    lexer.nextToken();
+                    matchKeywords(Keywords.IDENTIFIED);
+                    match(Token.KW_BY);
+                    identified = exprParser.parseString();
+                }
+                Long ignoreLine = null;
+                if (lexer.token() == Token.KW_IGNORE) {
+                    lexer.nextToken();
+                    ignoreLine = exprParser.longValue();
+                    match(Token.KW_LINES, Token.KW_ROWS);
+                }
+                List<Expression> columns = null;
+                if (lexer.token() == Token.PUNC_LEFT_PAREN) {
+                    lexer.nextToken();
+                    columns = new ArrayList<>();
+                    Expression expr = exprParser.expression();
+                    columns.add(expr);
+                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                        lexer.nextToken();
+                        expr = exprParser.expression();
+                        columns.add(expr);
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                }
+                List<ComparisionExpression> values = null;
+                if (lexer.token() == Token.KW_SET) {
+                    lexer.nextToken();
+                    values = new ArrayList<>();
+                    ComparisionExpression expr = loadComparisionExpression();
+                    values.add(expr);
+                    for (; lexer.token() == Token.PUNC_COMMA;) {
+                        lexer.nextToken();
+                        expr = loadComparisionExpression();
+                        values.add(expr);
+                    }
+                }
+                return new DMLLoadXMLStatement(priority, isLocal, fileName, insertType, table,
+                    identified, charset, ignoreLine, columns, values);
+            }
+        } else if (lexer.token() == Token.KW_INDEX) {
+            lexer.nextToken();
+            match(Token.KW_INTO);
+            matchKeywords(Keywords.CACHE);
+            List<DALLoadIndexIntoCacheStatement.TableIndexList> tableIndexLists = new ArrayList<>();
+            DALLoadIndexIntoCacheStatement loadIndexIntoCacheStatement =
+                new DALLoadIndexIntoCacheStatement(tableIndexLists);
+            do {
+                if (lexer.token() == Token.PUNC_COMMA) {
+                    lexer.nextToken();
+                }
+                Identifier table = null;
+                boolean partitionAll = false;
+                List<Identifier> partitions = null;
+                List<Identifier> indexs = null;
+                boolean ignoreLeaves = false;
+                table = identifier(true);
+                if (lexer.token() == Token.KW_PARTITION) {
+                    lexer.nextToken();
+                    match(Token.PUNC_LEFT_PAREN);
+                    if (lexer.token() == Token.KW_ALL) {
+                        partitionAll = true;
+                        lexer.nextToken();
+                    } else {
+                        partitions = new ArrayList<>();
+                        partitions.add(identifier(false));
+                        while (lexer.token() == Token.PUNC_COMMA) {
+                            lexer.nextToken();
+                            partitions.add(identifier(false));
+                        }
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                }
+                if (lexer.token() == Token.KW_INDEX || lexer.token() == Token.KW_KEY) {
+                    lexer.nextToken();
+                    indexs = new ArrayList<>();
+                    match(Token.PUNC_LEFT_PAREN);
+                    indexs.add(identifier(false));
+                    while (lexer.token() == Token.PUNC_COMMA) {
+                        lexer.nextToken();
+                        indexs.add(identifier(false));
+                    }
+                    match(Token.PUNC_RIGHT_PAREN);
+                }
+                if (lexer.token() == Token.KW_IGNORE) {
+                    lexer.nextToken();
+                    matchKeywords(Keywords.LEAVES);
+                    ignoreLeaves = true;
+                }
+                DALLoadIndexIntoCacheStatement.TableIndexList tableIndexList =
+                    loadIndexIntoCacheStatement.new TableIndexList(table, partitionAll,
+                        partitions, indexs, ignoreLeaves);
+                tableIndexLists.add(tableIndexList);
+            } while (lexer.token() == Token.PUNC_COMMA);
+            return new DALLoadIndexIntoCacheStatement(tableIndexLists);
+        }
+        throw new SQLSyntaxErrorException("expect DATA | XML | INDEX");
+    }
+
     // protected
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {
@@ -1418,5 +1686,11 @@ public class MySQLDMLParser extends AbstractParser {
         return 0;
     }
 
+    private ComparisionExpression loadComparisionExpression() throws SQLSyntaxErrorException {
+        Identifier column = identifier();
+        match(Token.OP_EQUALS);
+        Expression right = exprParser.expression();
+        return new ComparisionExpression(column, right, ComparisionExpression.EQUALS);
+    }
 
 }

@@ -45,6 +45,8 @@ import parser.ast.stmt.compound.cursors.CursorDeclareStatement;
 import parser.ast.stmt.compound.cursors.CursorFetchStatement;
 import parser.ast.stmt.compound.cursors.CursorOpenStatement;
 import parser.ast.stmt.compound.flowcontrol.*;
+import parser.ast.stmt.dal.DALLoadIndexIntoCacheStatement;
+import parser.ast.stmt.dal.DALLoadIndexIntoCacheStatement.TableIndexList;
 import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
 import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
@@ -4972,7 +4974,219 @@ public class OutputVisitor implements Visitor {
         appendable.append(k(Keywords.IMPORT)).append(t(Token.KW_TABLE), 0).append(t(Token.KW_FROM),
             2);
         printList(node.getFiles());
+    }
 
+    @Override
+    public void visit(DMLLoadDataInFileStatement node) {
+        appendable.append(t(Token.KW_LOAD)).append(k(Keywords.DATA), 1);
+        if (node.getPriority() != null) {
+            switch (node.getPriority()) {
+                case DMLLoadDataInFileStatement.LOW_PRIORITY:
+                    appendable.append(t(Token.KW_LOW_PRIORITY), 1);
+                    break;
+                case DMLLoadDataInFileStatement.CONCURRENT:
+                    appendable.append(k(Keywords.CONCURRENT), 1);
+                    break;
+            }
+        }
+        if (node.isLocal() != null && node.isLocal()) {
+            appendable.append(k(Keywords.LOCAL), 1);
+        }
+        appendable.append(t(Token.KW_INFILE), 0);
+        print(node.getFileName());
+        if (node.getInsertType() != null) {
+            switch (node.getInsertType()) {
+                case DMLLoadDataInFileStatement.REPLACE:
+                    appendable.append(t(Token.KW_REPLACE), 1);
+                    break;
+                case DMLLoadDataInFileStatement.IGNORE:
+                    appendable.append(t(Token.KW_IGNORE), 1);
+                    break;
+            }
+        }
+        appendable.append(t(Token.KW_INTO), 1).append(t(Token.KW_TABLE), 0);
+        print(node.getTable());
+        List<Identifier> partition = node.getPartition();
+        if (partition != null && !partition.isEmpty()) {
+            Iterator<Identifier> itor = partition.iterator();
+            appendable.append(t(Token.KW_PARTITION), 1).append('(');
+            while (itor.hasNext()) {
+                appendable.append(itor.next().getIdText());
+                if (itor.hasNext()) {
+                    appendable.append(',');
+                }
+            }
+            appendable.append(')');
+        }
+        Identifier charset = node.getCharset();
+        if (charset != null) {
+            appendable.append(t(Token.KW_CHARACTER), 1).append(t(Token.KW_SET), 0);
+            print(charset);
+        }
+        LiteralString fieldsTerminatedBy = node.getFieldsTerminatedBy();
+        LiteralString fieldsEnclosedBy = node.getFieldsEnclosedBy();
+        LiteralString fieldsEscapedBy = node.getFieldsEscapedBy();
+        if (fieldsTerminatedBy != null || fieldsEnclosedBy != null || fieldsEscapedBy != null) {
+            appendable.append(k(Keywords.FIELDS), 1);
+            if (fieldsTerminatedBy != null) {
+                appendable.append(t(Token.KW_TERMINATED), 1).append(t(Token.KW_BY), 0);
+                print(fieldsTerminatedBy);
+            }
+            if (fieldsEnclosedBy != null) {
+                appendable.append(t(Token.KW_ENCLOSED), 1).append(t(Token.KW_BY), 0);
+                print(fieldsEnclosedBy);
+            }
+            if (fieldsEscapedBy != null) {
+                appendable.append(t(Token.KW_ESCAPED), 1).append(t(Token.KW_BY), 0);
+                print(fieldsEscapedBy);
+            }
+        }
+        LiteralString linesStartingBy = node.getLinesStartingBy();
+        LiteralString linesTerminatedBy = node.getLinesTerminatedBy();
+        if (linesStartingBy != null || linesTerminatedBy != null) {
+            appendable.append(t(Token.KW_LINES), 1);
+            if (linesStartingBy != null) {
+                appendable.append(t(Token.KW_STARTING), 1).append(t(Token.KW_BY), 0);
+                print(linesStartingBy);
+            }
+            if (linesTerminatedBy != null) {
+                appendable.append(t(Token.KW_TERMINATED), 1).append(t(Token.KW_BY), 0);
+                print(linesTerminatedBy);
+            }
+        }
+        Long ignoreLine = node.getIgnoreLine();
+        if (ignoreLine != null) {
+            appendable.append(t(Token.KW_IGNORE), 0).append(ignoreLine).append(t(Token.KW_LINES),
+                1);
+        }
+        List<Expression> columns = node.getColumns();
+        if (columns != null && !columns.isEmpty()) {
+            appendable.append(' ');
+            appendable.append('(');
+            printList(columns);
+            appendable.append(')');
+        }
+        List<ComparisionExpression> values = node.getValues();
+        if (values != null && !values.isEmpty()) {
+            appendable.append(t(Token.KW_SET), 0);
+            printList(values);
+        }
+    }
+
+    @Override
+    public void visit(DMLLoadXMLStatement node) {
+        appendable.append(t(Token.KW_LOAD)).append(k(Keywords.XML), 1);
+        if (node.getPriority() != null) {
+            switch (node.getPriority()) {
+                case DMLLoadXMLStatement.LOW_PRIORITY:
+                    appendable.append(t(Token.KW_LOW_PRIORITY), 1);
+                    break;
+                case DMLLoadXMLStatement.CONCURRENT:
+                    appendable.append(k(Keywords.CONCURRENT), 1);
+                    break;
+            }
+        }
+        if (node.isLocal() != null && node.isLocal()) {
+            appendable.append(k(Keywords.LOCAL), 1);
+        }
+        appendable.append(t(Token.KW_INFILE), 0);
+        print(node.getFileName());
+        if (node.getInsertType() != null) {
+            switch (node.getInsertType()) {
+                case DMLLoadXMLStatement.REPLACE:
+                    appendable.append(t(Token.KW_REPLACE), 1);
+                    break;
+                case DMLLoadXMLStatement.IGNORE:
+                    appendable.append(t(Token.KW_IGNORE), 1);
+                    break;
+            }
+        }
+        appendable.append(t(Token.KW_INTO), 1).append(t(Token.KW_TABLE), 0);
+        print(node.getTable());
+        Identifier charset = node.getCharset();
+        if (charset != null) {
+            appendable.append(t(Token.KW_CHARACTER), 1).append(t(Token.KW_SET), 0);
+            print(charset);
+        }
+        LiteralString identified = node.getIdentified();
+        if (identified != null) {
+            appendable.append(t(Token.KW_ROWS), 0).append(k(Keywords.IDENTIFIED))
+                .append(t(Token.KW_BY), 0);
+            print(identified);
+        }
+        Long ignoreLine = node.getIgnoreLine();
+        if (ignoreLine != null) {
+            appendable.append(t(Token.KW_IGNORE), 0).append(ignoreLine).append(t(Token.KW_LINES),
+                1);
+        }
+        List<Expression> columns = node.getColumns();
+        if (columns != null && !columns.isEmpty()) {
+            appendable.append('(');
+            printList(columns);
+            appendable.append(')');
+        }
+        List<ComparisionExpression> values = node.getValues();
+        if (values != null && !values.isEmpty()) {
+            appendable.append(t(Token.KW_SET), 0);
+            printList(values);
+        }
+    }
+
+    @Override
+    public void visit(DALLoadIndexIntoCacheStatement node) {
+        appendable.append(t(Token.KW_LOAD)).append(t(Token.KW_INDEX), 0).append(t(Token.KW_INTO))
+            .append(k(Keywords.CACHE), 0);
+        List<TableIndexList> list = node.getTableIndexList();
+        if (list != null && !list.isEmpty()) {
+            boolean first = true;
+            for (TableIndexList li : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(li);
+            }
+        }
+    }
+
+    @Override
+    public void visit(TableIndexList node) {
+        print(node.getTable());
+        if (node.isPartitionAll()) {
+            appendable.append(t(Token.KW_PARTITION), 0).append('(').append(t(Token.KW_ALL))
+                .append(')');
+        } else if (node.getPartitions() != null) {
+            appendable.append(t(Token.KW_PARTITION), 0).append('(');
+            List<Identifier> list = node.getPartitions();
+            boolean first = true;
+            for (Identifier id : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(id);
+            }
+            appendable.append(')');
+        }
+        if (node.getIndexs() != null) {
+            appendable.append(t(Token.KW_INDEX), 0).append('(');
+            List<Identifier> list = node.getIndexs();
+            boolean first = true;
+            for (Identifier id : list) {
+                if (first) {
+                    first = false;
+                } else {
+                    appendable.append(',');
+                }
+                print(id);
+            }
+            appendable.append(')');
+        }
+        if (node.isIgnoreLeaves()) {
+            appendable.append(t(Token.KW_IGNORE), 0).append(k(Keywords.LEAVES));
+        }
     }
 }
 
