@@ -55,6 +55,7 @@ MySQL高性能解析器，采用byte流解析。
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
 - [call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
+- [do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
 
 # 参考
 [cobar](https://github.com/alibaba/cobar)
