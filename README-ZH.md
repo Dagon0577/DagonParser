@@ -20,11 +20,21 @@ MySQL高性能解析器，采用byte流解析。
 词法分析和语法分析参考MySQL 8.0
 
 # 解析语句
+
+## DML
 - [Select](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 - [Update](https://dev.mysql.com/doc/refman/8.0/en/update.html)
 - [Delete](https://dev.mysql.com/doc/refman/8.0/en/delete.html)
 - [Insert](https://dev.mysql.com/doc/refman/8.0/en/insert.html)
 - [Replace](https://dev.mysql.com/doc/refman/8.0/en/replace.html)
+- [Call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
+- [Do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
+- [Handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
+- [ImportTable](https://dev.mysql.com/doc/refman/8.0/en/import-table.html)
+- [LoadData](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
+- [LoadXML](https://dev.mysql.com/doc/refman/8.0/en/load-xml.html)
+
+## DDL
 - Create
     - [CreateTable](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
     - [CreateTrigger](https://dev.mysql.com/doc/refman/8.0/en/create-trigger.html)
@@ -54,14 +64,7 @@ MySQL高性能解析器，采用byte流解析。
     - [AlterServer](https://dev.mysql.com/doc/refman/8.0/en/alter-server.html)
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
-- [Call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
-- [Do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
-- [Handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
-- [ImportTable](https://dev.mysql.com/doc/refman/8.0/en/import-table.html)
-- [LoadData](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
-- [LoadXML](https://dev.mysql.com/doc/refman/8.0/en/load-xml.html)
-
-
+    
 # 参考
 [cobar](https://github.com/alibaba/cobar)
 
