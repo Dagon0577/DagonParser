@@ -373,4 +373,7 @@ public interface Visitor {
     public void visit(DALAlterUserStatement node);
 
     public void visit(DALAlterResourceGroupStatement node);
+
+    public void visit(DMLCallStatement node);
+
 }

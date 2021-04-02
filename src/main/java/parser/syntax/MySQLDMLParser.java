@@ -431,6 +431,37 @@ public class MySQLDMLParser extends AbstractParser {
         throw new SQLSyntaxErrorException("unexpected token for replace: " + lexer.token());
     }
 
+    public DMLCallStatement call() throws SQLSyntaxErrorException {
+        match(Token.KW_CALL);
+        Identifier procedure = identifier();
+        match(Token.PUNC_LEFT_PAREN);
+        if (lexer.token() == Token.PUNC_RIGHT_PAREN) {
+            lexer.nextToken();
+            return new DMLCallStatement(procedure, null);
+        }
+        List<Expression> arguments;
+        Expression expr = exprParser.expression();
+        switch (lexer.token()) {
+            case Token.PUNC_COMMA:
+                arguments = new LinkedList<Expression>();
+                arguments.add(expr);
+                for (; lexer.token() == Token.PUNC_COMMA;) {
+                    lexer.nextToken();
+                    expr = exprParser.expression();
+                    arguments.add(expr);
+                }
+                match(Token.PUNC_RIGHT_PAREN);
+                return new DMLCallStatement(procedure, arguments);
+            case Token.PUNC_RIGHT_PAREN:
+                lexer.nextToken();
+                arguments = new ArrayList<Expression>(1);
+                arguments.add(expr);
+                return new DMLCallStatement(procedure, arguments);
+            default:
+                throw new SQLSyntaxErrorException("expect ',' or ')' after first argument of procedure");
+        }
+    }
+
     // protected
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {

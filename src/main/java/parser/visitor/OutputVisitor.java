@@ -4869,5 +4869,15 @@ public class OutputVisitor implements Visitor {
             appendable.append(t(Token.KW_CHECK)).append(t(Token.KW_OPTION), 1);
         }
     }
+
+    @Override
+    public void visit(DMLCallStatement node) {
+        appendable.append(t(Token.KW_CALL), 0);
+        print(node.getName());
+        appendable.append('(');
+        printList(node.getParams());
+        appendable.append(')');
+    }
+
 }
 
