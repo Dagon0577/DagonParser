@@ -462,6 +462,25 @@ public class MySQLDMLParser extends AbstractParser {
         }
     }
 
+    public DMLDoStatement parseDo() throws SQLSyntaxErrorException {
+        matchKeywords(Keywords.DO);
+        List<Expression> arguments;
+        Expression expr = exprParser.expression();
+        if (lexer.token() == Token.EOF || lexer.token() == Token.PUNC_SEMICOLON) {
+            arguments = new ArrayList<>(1);
+            arguments.add(expr);
+            return new DMLDoStatement(arguments);
+        }
+        arguments = new ArrayList<>();
+        arguments.add(expr);
+        while (lexer.token() == Token.PUNC_COMMA) {
+            lexer.nextToken();
+            expr = exprParser.expression();
+            arguments.add(expr);
+        }
+        return new DMLDoStatement(arguments);
+    }
+
     // protected
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {

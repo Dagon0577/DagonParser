@@ -1,6 +1,7 @@
 package parser.ast.fragment;
 
 import parser.ast.AST;
+import parser.ast.expression.primary.ParamMarker;
 import parser.visitor.Visitor;
 
 /**

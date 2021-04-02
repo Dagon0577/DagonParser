@@ -1,3 +1,5 @@
+package parser.syntax;
+
 import parser.ast.stmt.SQLStatement;
 import parser.ast.stmt.dml.DMLCallStatement;
 import mysql.charset.MySqlCharset;

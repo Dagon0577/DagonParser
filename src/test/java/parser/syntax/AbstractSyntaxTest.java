@@ -1,3 +1,5 @@
+package parser.syntax;
+
 import junit.framework.TestCase;
 import parser.ast.AST;
 import parser.visitor.OutputVisitor;

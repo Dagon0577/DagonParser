@@ -1,7 +1,8 @@
+package parser.syntax;
+
 import parser.ast.stmt.SQLStatement;
 import parser.ast.stmt.dml.DMLInsertReplaceStatement;
 import mysql.charset.MySqlCharset;
-import parser.syntax.Parser;
 import parser.util.Tuple2;
 import java.util.List;
 

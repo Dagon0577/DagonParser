@@ -376,4 +376,6 @@ public interface Visitor {
 
     public void visit(DMLCallStatement node);
 
+    public void visit(DMLDoStatement node);
+
 }

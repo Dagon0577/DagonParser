@@ -4879,5 +4879,10 @@ public class OutputVisitor implements Visitor {
         appendable.append(')');
     }
 
+    @Override
+    public void visit(DMLDoStatement node) {
+        appendable.append(k(Keywords.DO), 2);
+        printList(node.getExprs());
+    }
 }
 

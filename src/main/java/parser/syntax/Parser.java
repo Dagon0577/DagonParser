@@ -95,6 +95,9 @@ public class Parser {
                                 stmt = new MySQLCmpdParser(lexer, exprParser).beginEnd(null);
                             }
                             break stmtSwitch;
+                        case Keywords.DO:
+                            stmt = new MySQLDMLParser(lexer, exprParser).parseDo();
+                            break stmtSwitch;
                     }
                     Identifier label = exprParser.identifier();
                     byte[] id = label.getIdText();

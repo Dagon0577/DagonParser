@@ -1,3 +1,5 @@
+package parser.syntax;
+
 import mysql.charset.MySqlCharset;
 import parser.ast.stmt.SQLStatement;
 import parser.ast.stmt.dml.DMLInsertReplaceStatement;
