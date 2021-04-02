@@ -51,35 +51,35 @@ public class Parser {
                 case Token.KW_SELECT:
                 case Token.PUNC_LEFT_PAREN:
                     stmt = new MySQLDMLSelectParser(lexer, exprParser).selectUnion(false);
-                    break stmtSwitch;
+                    break;
                 case Token.KW_CREATE:
                     stmt = new MySQLDDLParser(lexer, exprParser).create();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_SET:
                     stmt = new MySQLDALParser(lexer, exprParser).set();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_DECLARE:
                     stmt = new MySQLCmpdParser(lexer, exprParser).declare();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_UPDATE:
                     stmt = new MySQLDMLParser(lexer, exprParser).update();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_INSERT:
                     stmt = new MySQLDMLParser(lexer, exprParser).insert();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_DELETE:
                     stmt = new MySQLDMLParser(lexer, exprParser).delete();
                     ((DMLDeleteStatement)stmt).setConditions(lexer.getAndResetConditions());
-                    break stmtSwitch;
+                    break;
                 case Token.KW_REPLACE:
                     stmt = new MySQLDMLParser(lexer, exprParser).replace();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_ALTER:
                     stmt = new MySQLDDLParser(lexer, exprParser).alter();
-                    break stmtSwitch;
+                    break;
                 case Token.KW_CALL:
                     stmt = new MySQLDMLParser(lexer, exprParser).call();
-                    break stmtSwitch;
+                    break;
                 case Token.IDENTIFIER: {
                     switch (lexer.parseKeyword()) {
                         case Keywords.END:
@@ -98,6 +98,9 @@ public class Parser {
                         case Keywords.DO:
                             stmt = new MySQLDMLParser(lexer, exprParser).parseDo();
                             break stmtSwitch;
+                        case Keywords.HANDLER:
+                            stmt = new MySQLDMLParser(lexer, exprParser).handler();
+                            break stmtSwitch;
                     }
                     Identifier label = exprParser.identifier();
                     byte[] id = label.getIdText();
@@ -105,10 +108,8 @@ public class Parser {
                     break;
                 }
             }
-            if (isEOF) {
-                while (lexer.token() == Token.PUNC_SEMICOLON) {
-                    lexer.nextToken();
-                }
+            while (lexer.token() == Token.PUNC_SEMICOLON) {
+                lexer.nextToken();
             }
             long parseInfo = lexer.getAndResetParseInfo();
             if (stmt == null) {

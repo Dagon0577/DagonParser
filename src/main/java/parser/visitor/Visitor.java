@@ -378,4 +378,6 @@ public interface Visitor {
 
     public void visit(DMLDoStatement node);
 
+    public void visit(DMLHandlerStatement node);
+
 }

@@ -481,6 +481,99 @@ public class MySQLDMLParser extends AbstractParser {
         return new DMLDoStatement(arguments);
     }
 
+    public DMLHandlerStatement handler() throws SQLSyntaxErrorException {
+        matchKeywords(Keywords.HANDLER);
+        Identifier table = identifier(false);
+        switch (lexer.token()) {
+            case Token.KW_READ: {
+                lexer.nextToken();
+                Integer order = null;
+                Identifier index = null;
+                if (lexer.token() == Token.IDENTIFIER) {
+                    int n = getHandlerOrder();
+                    if (n > 0) {
+                        order = n;
+                    } else {
+                        index = identifier();
+                        n = getHandlerOrder();
+                        if (n > 0) {
+                            order = n;
+                        }
+                    }
+                }
+                Integer operator = null;
+                List<Expression> arguments = null;
+                switch (lexer.token()) {
+                    case Token.OP_EQUALS:
+                        operator = DMLHandlerStatement.EQUALS;
+                    case Token.OP_LESS_OR_EQUALS:
+                        if (operator == null) {
+                            operator = DMLHandlerStatement.LESS_EQUALS;
+                        }
+                    case Token.OP_GREATER_OR_EQUALS:
+                        if (operator == null) {
+                            operator = DMLHandlerStatement.GREAT_EQUALS;
+                        }
+                    case Token.OP_LESS_THAN:
+                        if (operator == null) {
+                            operator = DMLHandlerStatement.LESS;
+                        }
+                    case Token.OP_GREATER_THAN:
+                        if (operator == null) {
+                            operator = DMLHandlerStatement.GREAT;
+                        }
+                        lexer.nextToken();
+                        match(Token.PUNC_LEFT_PAREN);
+                        Expression expr = exprParser.expression();
+                        switch (lexer.token()) {
+                            case Token.PUNC_COMMA:
+                                arguments = new LinkedList<Expression>();
+                                arguments.add(expr);
+                                for (; lexer.token() == Token.PUNC_COMMA;) {
+                                    lexer.nextToken();
+                                    expr = exprParser.expression();
+                                    arguments.add(expr);
+                                }
+                                match(Token.PUNC_RIGHT_PAREN);
+                                break;
+                            case Token.PUNC_RIGHT_PAREN:
+                                lexer.nextToken();
+                                arguments = new ArrayList<Expression>(1);
+                                arguments.add(expr);
+                                break;
+                        }
+                        break;
+                }
+                Expression where = null;
+                if (lexer.token() == Token.KW_WHERE) {
+                    lexer.nextToken();
+                    where = exprParser.expression();
+                }
+                Limit limit = null;
+                if (lexer.token() == Token.KW_LIMIT) {
+                    limit = limit(true);
+                }
+                return new DMLHandlerStatement(table, index, operator, arguments, order, where,
+                    limit);
+            }
+            case Token.IDENTIFIER: {
+                switch (lexer.parseKeyword()) {
+                    case Keywords.CLOSE:
+                        lexer.nextToken();
+                        return new DMLHandlerStatement(table);
+                    case Keywords.OPEN:
+                        lexer.nextToken();
+                        String alias = null;
+                        if (lexer.token() == Token.KW_AS) {
+                            alias = as();
+                        }
+                        return new DMLHandlerStatement(table, alias);
+                }
+            }
+        }
+        throw new SQLSyntaxErrorException("expect OPEN | READ | CLOSE");
+    }
+
     // protected
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {
@@ -1291,5 +1384,24 @@ public class MySQLDMLParser extends AbstractParser {
         match(Token.PUNC_RIGHT_PAREN);
         return row;
     }
+
+    private int getHandlerOrder() throws SQLSyntaxErrorException {
+        switch (lexer.parseKeyword()) {
+            case Keywords.FIRST:
+                lexer.nextToken();
+                return DMLHandlerStatement.FIRST;
+            case Keywords.NEXT:
+                lexer.nextToken();
+                return DMLHandlerStatement.NEXT;
+            case Keywords.PREV:
+                lexer.nextToken();
+                return DMLHandlerStatement.PREV;
+            case Keywords.LAST:
+                lexer.nextToken();
+                return DMLHandlerStatement.LAST;
+        }
+        return 0;
+    }
+
 
 }

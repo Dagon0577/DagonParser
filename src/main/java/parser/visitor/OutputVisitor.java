@@ -4884,5 +4884,87 @@ public class OutputVisitor implements Visitor {
         appendable.append(k(Keywords.DO), 2);
         printList(node.getExprs());
     }
+
+    @Override
+    public void visit(DMLHandlerStatement node) {
+        appendable.append(k(Keywords.HANDLER), 2);
+        print(node.getTable());
+        switch (node.getType()) {
+            case DMLHandlerStatement.OPEN: {
+                appendable.append(k(Keywords.OPEN), 1);
+                String alias = node.getAlias();
+                if (alias != null) {
+                    appendable.append(t(Token.KW_AS), 0);
+                    appendable.append(alias);
+                }
+                break;
+            }
+            case DMLHandlerStatement.READ: {
+                appendable.append(t(Token.KW_READ), 1);
+                if (node.getIndex() != null) {
+                    appendable.append(' ');
+                    print(node.getIndex());
+                }
+                Integer operator = node.getOperator();
+                if (operator != null) {
+                    switch (operator) {
+                        case DMLHandlerStatement.EQUALS:
+                            appendable.append('=');
+                            break;
+                        case DMLHandlerStatement.LESS_EQUALS:
+                            appendable.append('<').append('=');
+                            break;
+                        case DMLHandlerStatement.GREAT_EQUALS:
+                            appendable.append('>').append('=');
+                            break;
+                        case DMLHandlerStatement.LESS:
+                            appendable.append('<');
+                            break;
+                        case DMLHandlerStatement.GREAT:
+                            appendable.append('>');
+                            break;
+                    }
+                }
+                List<Expression> values = node.getValues();
+                if (values != null && !values.isEmpty()) {
+                    appendable.append('(');
+                    printList(values);
+                    appendable.append(')');
+                }
+                Integer order = node.getOrder();
+                if (order != null) {
+                    switch (order) {
+                        case DMLHandlerStatement.FIRST:
+                            appendable.append(k(Keywords.FIRST), 1);
+                            break;
+                        case DMLHandlerStatement.NEXT:
+                            appendable.append(k(Keywords.NEXT), 1);
+                            break;
+                        case DMLHandlerStatement.PREV:
+                            appendable.append(k(Keywords.PREV), 1);
+                            break;
+                        case DMLHandlerStatement.LAST:
+                            appendable.append(k(Keywords.LAST), 1);
+                            break;
+                    }
+                }
+                Expression where = node.getWhere();
+                if (where != null) {
+                    appendable.append(t(Token.KW_WHERE), 0);
+                    print(where);
+                }
+                Limit limit = node.getLimit();
+                if (limit != null) {
+                    appendable.append(' ');
+                    print(limit);
+                }
+            }
+            break;
+            case DMLHandlerStatement.CLOSE: {
+                appendable.append(k(Keywords.CLOSE), 1);
+                break;
+            }
+        }
+    }
 }
 
