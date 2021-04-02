@@ -101,6 +101,9 @@ public class Parser {
                         case Keywords.HANDLER:
                             stmt = new MySQLDMLParser(lexer, exprParser).handler();
                             break stmtSwitch;
+                        case Keywords.IMPORT:
+                            stmt = new MySQLDMLParser(lexer, exprParser).parseImport();
+                            break stmtSwitch;
                     }
                     Identifier label = exprParser.identifier();
                     byte[] id = label.getIdText();

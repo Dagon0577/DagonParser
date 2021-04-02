@@ -8,6 +8,7 @@ import parser.ast.expression.primary.ParamMarker;
 import parser.ast.expression.primary.RowExpression;
 import parser.ast.expression.primary.WithClause;
 import parser.ast.expression.primary.WithClause.CTE;
+import parser.ast.expression.primary.literal.LiteralString;
 import parser.ast.fragment.GroupBy;
 import parser.ast.fragment.Limit;
 import parser.ast.fragment.OrderBy;
@@ -574,6 +575,20 @@ public class MySQLDMLParser extends AbstractParser {
         throw new SQLSyntaxErrorException("expect OPEN | READ | CLOSE");
     }
 
+    public DMLImportTableStatement parseImport() throws SQLSyntaxErrorException {
+        matchKeywords(Keywords.IMPORT);
+        match(Token.KW_TABLE);
+        match(Token.KW_FROM);
+        List<LiteralString> files = new LinkedList<>();
+        LiteralString expr = exprParser.parseString();
+        files.add(expr);
+        for (; lexer.token() == Token.PUNC_COMMA;) {
+            lexer.nextToken();
+            expr = exprParser.parseString();
+            files.add(expr);
+        }
+        return new DMLImportTableStatement(files);
+    }
     // protected
 
     protected DMLSelectStatement selectPrimary() throws SQLSyntaxErrorException {

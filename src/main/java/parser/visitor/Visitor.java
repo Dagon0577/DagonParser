@@ -380,4 +380,5 @@ public interface Visitor {
 
     public void visit(DMLHandlerStatement node);
 
+    public void visit(DMLImportTableStatement node);
 }

@@ -4966,5 +4966,13 @@ public class OutputVisitor implements Visitor {
             }
         }
     }
+
+    @Override
+    public void visit(DMLImportTableStatement node) {
+        appendable.append(k(Keywords.IMPORT)).append(t(Token.KW_TABLE), 0).append(t(Token.KW_FROM),
+            2);
+        printList(node.getFiles());
+
+    }
 }
 
