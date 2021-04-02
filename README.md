@@ -58,6 +58,7 @@ Open the /src/test/java folder, select any statement, and run the unit test.
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
 - [call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
 - [do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
+- [handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
