@@ -54,9 +54,12 @@ MySQL高性能解析器，采用byte流解析。
     - [AlterServer](https://dev.mysql.com/doc/refman/8.0/en/alter-server.html)
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
-- [call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
-- [do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
-- [handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
+- [Call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
+- [Do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
+- [Handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
+- [ImportTable](https://dev.mysql.com/doc/refman/8.0/en/import-table.html)
+- [LoadData](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
+- [LoadXML](https://dev.mysql.com/doc/refman/8.0/en/load-xml.html)
 
 
 # 参考

@@ -56,9 +56,12 @@ Open the /src/test/java folder, select any statement, and run the unit test.
     - [AlterServer](https://dev.mysql.com/doc/refman/8.0/en/alter-server.html)
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
-- [call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
-- [do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
-- [handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
+- [Call](https://dev.mysql.com/doc/refman/8.0/en/call.html)
+- [Do](https://dev.mysql.com/doc/refman/8.0/en/do.html)
+- [Handler](https://dev.mysql.com/doc/refman/8.0/en/handler.html)
+- [ImportTable](https://dev.mysql.com/doc/refman/8.0/en/import-table.html)
+- [LoadData](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
+- [LoadXML](https://dev.mysql.com/doc/refman/8.0/en/load-xml.html)
 
 # reference
 [cobar](https://github.com/alibaba/cobar)
