@@ -66,7 +66,21 @@ Open the /src/test/java folder, select any statement, and run the unit test.
     - [AlterServer](https://dev.mysql.com/doc/refman/8.0/en/alter-server.html)
     - [AlterTablespace](https://dev.mysql.com/doc/refman/8.0/en/alter-tablespace.html)
     - [AlterUser](https://dev.mysql.com/doc/refman/8.0/en/alter-user.html)
-    
+- Drop
+    - [DropDatabase](https://dev.mysql.com/doc/refman/8.0/en/drop-database.html)
+    - [DropEvent](https://dev.mysql.com/doc/refman/8.0/en/drop-event.html)
+    - [DropFunction](https://dev.mysql.com/doc/refman/8.0/en/drop-function-udf.html)
+    - [DropIndex](https://dev.mysql.com/doc/refman/8.0/en/drop-index.html)
+    - [DropLogfileGroup](https://dev.mysql.com/doc/refman/8.0/en/drop-logfile-group.html)
+    - [DropProcedure](https://dev.mysql.com/doc/refman/8.0/en/drop-procedure.html)
+    - [DropServer](https://dev.mysql.com/doc/refman/8.0/en/drop-server.html)
+    - [DropSpatialReferenceSystem](https://dev.mysql.com/doc/refman/8.0/en/drop-spatial-reference-system.html)
+    - [DropTablespace](https://dev.mysql.com/doc/refman/8.0/en/drop-tablespace.html)
+    - [DropTable](https://dev.mysql.com/doc/refman/8.0/en/drop-table.html)
+    - [DropTrigger](https://dev.mysql.com/doc/refman/8.0/en/drop-trigger.html)
+    - [DropView](https://dev.mysql.com/doc/refman/8.0/en/drop-view.html)
+
+
 # reference
 [cobar](https://github.com/alibaba/cobar)
 
