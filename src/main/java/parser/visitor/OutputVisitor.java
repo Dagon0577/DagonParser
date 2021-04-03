@@ -51,6 +51,7 @@ import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
 import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
+import parser.ast.stmt.dal.resource.DALDropResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
 import parser.ast.fragment.ddl.alter.Algorithm;
 import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
@@ -76,10 +77,23 @@ import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
 import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
+import parser.ast.stmt.ddl.drop.DDLDropDatabaseStatement;
+import parser.ast.stmt.ddl.drop.DDLDropEventStatement;
+import parser.ast.stmt.ddl.drop.DDLDropFunctionStatement;
+import parser.ast.stmt.ddl.drop.DDLDropIndexStatement;
+import parser.ast.stmt.ddl.drop.DDLDropLogfileGroupStatement;
+import parser.ast.stmt.ddl.drop.DDLDropProcedureStatement;
+import parser.ast.stmt.ddl.drop.DDLDropServerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTableStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTablespaceStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTriggerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropViewStatement;
 import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
 import parser.ast.stmt.dml.DMLSelectStatement.LockMode;
+import parser.ast.stmt.prepare.DeallocatePrepareStatement;
 import parser.ast.stmt.transactional.BeginStatement;
 import parser.ast.stmt.transactional.SetTransactionStatement;
 import parser.token.Functions;
@@ -5188,5 +5202,214 @@ public class OutputVisitor implements Visitor {
             appendable.append(t(Token.KW_IGNORE), 0).append(k(Keywords.LEAVES));
         }
     }
+
+    @Override
+    public void visit(DDLDropDatabaseStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_DATABASE), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropEventStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.EVENT), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropFunctionStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_FUNCTION), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropIndexStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_INDEX), 0);
+        print(node.getName());
+        appendable.append(t(Token.KW_ON), 0);
+        print(node.getTable());
+        if (node.getAlgorithm() != null) {
+            appendable.append(' ');
+            switch (node.getAlgorithm()) {
+                case DDLCreateIndexStatement.ALGORITHM_DEFAULT:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=')
+                        .append(t(Token.KW_DEFAULT));
+                    break;
+                case DDLCreateIndexStatement.ALGORITHM_COPY:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=').append("COPY");
+                    break;
+                case DDLCreateIndexStatement.ALGORITHM_INPLACE:
+                    appendable.append(k(Keywords.ALGORITHM)).append('=').append("INPLACE");
+                    break;
+            }
+        }
+        if (node.getLockOption() != null) {
+            appendable.append(' ');
+            switch (node.getLockOption()) {
+                case DDLCreateIndexStatement.LOCK_DEFAULT:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append(t(Token.KW_DEFAULT));
+                    break;
+                case DDLCreateIndexStatement.LOCK_NONE:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append(k(Keywords.NONE));
+                    break;
+                case DDLCreateIndexStatement.LOCK_SHARED:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append("SHARED");
+                    break;
+                case DDLCreateIndexStatement.LOCK_EXCLUSIVE:
+                    appendable.append(t(Token.KW_LOCK)).append('=').append("EXCLUSIVE");
+                    break;
+            }
+        }
+    }
+
+    @Override
+    public void visit(DDLDropLogfileGroupStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.LOGFILE), 0).append(t(Token.KW_GROUP),
+            2);
+        print(node.getName());
+        appendable.append(k(Keywords.ENGINE), 1).append('=');
+        print(node.getEngine());
+    }
+
+    @Override
+    public void visit(DDLDropProcedureStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_PROCEDURE), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropServerStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.SERVER), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropSpatialReferenceSystemStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_SPATIAL), 0)
+            .append(k(Keywords.REFERENCE)).append(t(Token.KW_SYSTEM), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getSrid());
+    }
+
+    @Override
+    public void visit(DDLDropTablespaceStatement node) {
+        appendable.append(t(Token.KW_DROP));
+        if (node.isUndo()) {
+            appendable.append(t(Token.KW_UNDO), 1);
+        }
+        appendable.append(k(Keywords.TABLESPACE), 0);
+        print(node.getName());
+        if (node.getEngine() != null) {
+            appendable.append(k(Keywords.ENGINE), 1).append('=');
+            print(node.getEngine());
+        }
+
+    }
+
+    @Override
+    public void visit(DDLDropTableStatement node) {
+        appendable.append(t(Token.KW_DROP));
+        if (node.isTemporary()) {
+            appendable.append(k(Keywords.TEMPORARY), 1);
+        }
+        appendable.append(t(Token.KW_TABLE), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        boolean first = true;
+        for (Identifier t : node.getTables()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            print(t);
+        }
+        if (node.getRestrict() != null) {
+            appendable.append(' ')
+                .append(node.getRestrict() ? t(Token.KW_RESTRICT) : t(Token.KW_CASCADE));
+        }
+    }
+
+    @Override
+    public void visit(DDLDropTriggerStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(t(Token.KW_TRIGGER), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        print(node.getName());
+    }
+
+    @Override
+    public void visit(DDLDropViewStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.VIEW), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        boolean first = true;
+        for (Identifier t : node.getViews()) {
+            if (first) {
+                first = false;
+            } else {
+                appendable.append(',');
+            }
+            print(t);
+        }
+        if (node.getRestrict() != null) {
+            appendable.append(' ')
+                .append(node.getRestrict() ? t(Token.KW_RESTRICT) : t(Token.KW_CASCADE));
+        }
+    }
+
+    @Override
+    public void visit(DALDropRoleStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.ROLE), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        printList(node.getRoles());
+    }
+
+    @Override
+    public void visit(DALDropUserStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.USER), 0);
+        if (node.isIfExists()) {
+            appendable.append(t(Token.KW_IF)).append(t(Token.KW_EXISTS), 0);
+        }
+        printList(node.getUsers());
+    }
+
+    @Override
+    public void visit(DALDropResourceGroupStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.RESOURCE), 0)
+            .append(t(Token.KW_GROUP), 2);
+        print(node.getName());
+        if (node.isForce()) {
+            appendable.append(t(Token.KW_FORCE), 1);
+        }
+    }
+
+    @Override
+    public void visit(DeallocatePrepareStatement node) {
+        appendable.append(t(Token.KW_DROP)).append(k(Keywords.PREPARE), 0);
+        print(node.getName());
+    }
+
 }
 

@@ -1,5 +1,6 @@
 package parser.syntax;
 
+import java.util.LinkedList;
 import parser.ast.expression.Expression;
 import parser.ast.expression.QueryExpression;
 import parser.ast.expression.primary.Identifier;
@@ -39,10 +40,13 @@ import parser.ast.stmt.dal.account.AuthOption;
 import parser.ast.stmt.dal.account.DALAlterUserStatement;
 import parser.ast.stmt.dal.account.DALCreateRoleStatement;
 import parser.ast.stmt.dal.account.DALCreateUserStatement;
+import parser.ast.stmt.dal.account.DALDropRoleStatement;
+import parser.ast.stmt.dal.account.DALDropUserStatement;
 import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
 import parser.ast.fragment.ddl.alter.Algorithm;
 import parser.ast.fragment.ddl.alter.Lock;
+import parser.ast.stmt.dal.resource.DALDropResourceGroupStatement;
 import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
 import parser.ast.stmt.ddl.alter.DDLAlterEventStatement;
 import parser.ast.stmt.ddl.alter.DDLAlterFunctionStatement;
@@ -65,6 +69,19 @@ import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
 import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
+import parser.ast.stmt.ddl.drop.DDLDropDatabaseStatement;
+import parser.ast.stmt.ddl.drop.DDLDropEventStatement;
+import parser.ast.stmt.ddl.drop.DDLDropFunctionStatement;
+import parser.ast.stmt.ddl.drop.DDLDropIndexStatement;
+import parser.ast.stmt.ddl.drop.DDLDropLogfileGroupStatement;
+import parser.ast.stmt.ddl.drop.DDLDropProcedureStatement;
+import parser.ast.stmt.ddl.drop.DDLDropServerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTableStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTablespaceStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTriggerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropViewStatement;
+import parser.ast.stmt.prepare.DeallocatePrepareStatement;
 import parser.lexer.Lexer;
 import parser.token.IntervalUnit;
 import parser.token.Keywords;
@@ -1112,6 +1129,365 @@ public class MySQLDDLParser extends AbstractParser {
                 }
         }
         return null;
+    }
+
+    public SQLStatement drop() throws SQLSyntaxErrorException {
+        switch (lexer.nextToken()) {
+            case Token.KW_INDEX:
+                return dropIndex();
+            case Token.KW_TABLE:
+                lexer.nextToken();
+                return dropTable(false);
+            case Token.KW_TRIGGER:
+                lexer.nextToken();
+                return dropTrigger();
+            case Token.KW_DATABASE:
+            case Token.KW_SCHEMA:
+                lexer.nextToken();
+                return dropDatabase();
+            case Token.KW_FUNCTION:
+                lexer.nextToken();
+                return dropFunction();
+            case Token.KW_PROCEDURE:
+                lexer.nextToken();
+                return dropProcedure();
+            case Token.KW_SPATIAL:
+                lexer.nextToken();
+                matchKeywords(Keywords.REFERENCE);
+                match(Token.KW_SYSTEM);
+                return dropSpatialReferenceSystem();
+            case Token.KW_UNDO:
+                lexer.nextToken();
+                matchKeywords(Keywords.TABLESPACE);
+                return dropTablespace(true);
+            case Token.IDENTIFIER:
+                boolean isTemporary = false;
+                switch (lexer.parseKeyword()) {
+                    case Keywords.TEMPORARY:
+                        isTemporary = true;
+                        lexer.nextToken();
+                        match(Token.KW_TABLE);
+                        return dropTable(isTemporary);
+                    case Keywords.PREPARE:
+                        return dropPrepare();
+                    case Keywords.EVENT:
+                        lexer.nextToken();
+                        return dropEvent();
+                    case Keywords.LOGFILE:
+                        lexer.nextToken();
+                        match(Token.KW_GROUP);
+                        return dropLogfileGroup();
+                    case Keywords.RESOURCE:
+                        lexer.nextToken();
+                        match(Token.KW_GROUP);
+                        return dropResourceGroup();
+                    case Keywords.ROLE:
+                        lexer.nextToken();
+                        return dropRole();
+                    case Keywords.SERVER:
+                        lexer.nextToken();
+                        return dropServer();
+                    case Keywords.TABLESPACE:
+                        lexer.nextToken();
+                        return dropTablespace(false);
+                    case Keywords.USER:
+                        lexer.nextToken();
+                        return dropUser();
+                    case Keywords.VIEW:
+                        lexer.nextToken();
+                        return dropView();
+                    default:
+                        throw new SQLSyntaxErrorException("unsupported DDL for DROP");
+                }
+            default:
+                throw new SQLSyntaxErrorException("unsupported DDL for DROP");
+        }
+    }
+
+    private SQLStatement dropView() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        List<Identifier> views = null;
+        Boolean restrict = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        views = new ArrayList<>();
+        views.add(identifier(false));
+        while (lexer.token() == Token.PUNC_COMMA) {
+            lexer.nextToken();
+            views.add(identifier(false));
+        }
+        if (lexer.token() == Token.KW_RESTRICT) {
+            lexer.nextToken();
+            restrict = true;
+        } else if (lexer.token() == Token.KW_CASCADE) {
+            lexer.nextToken();
+            restrict = false;
+        }
+        return new DDLDropViewStatement(ifExists, views, restrict);
+    }
+
+    private SQLStatement dropUser() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        List<Expression> users = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        users = new ArrayList<>();
+        users.add(exprParser.expression());
+        while (lexer.token() == Token.PUNC_COMMA) {
+            lexer.nextToken();
+            users.add(exprParser.expression());
+        }
+        return new DALDropUserStatement(ifExists, users);
+    }
+
+    private SQLStatement dropTablespace(boolean undo) throws SQLSyntaxErrorException {
+        Identifier name = null;
+        Identifier engine = null;
+        name = identifier(false);
+        if (lexer.token() == Token.IDENTIFIER && lexer.parseKeyword() == Keywords.ENGINE) {
+            if (lexer.nextToken() == Token.OP_EQUALS) {
+                lexer.nextToken();
+            }
+            engine = identifier(false);
+        }
+        return new DDLDropTablespaceStatement(undo, name, engine);
+    }
+
+    private SQLStatement dropSpatialReferenceSystem() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        long srid = 0;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        srid = exprParser.longValue();
+        return new DDLDropSpatialReferenceSystemStatement(ifExists, srid);
+    }
+
+    private SQLStatement dropServer() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        Identifier name = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        name = identifier(false);
+        return new DDLDropServerStatement(ifExists, name);
+    }
+
+    private SQLStatement dropRole() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        List<Expression> roles = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        roles = new ArrayList<>();
+        roles.add(exprParser.expression());
+        while (lexer.token() == Token.PUNC_COMMA) {
+            lexer.nextToken();
+            roles.add(exprParser.expression());
+        }
+        return new DALDropRoleStatement(ifExists, roles);
+    }
+
+    private SQLStatement dropResourceGroup() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        boolean force = false;
+        name = identifier(false);
+        if (lexer.token() == Token.KW_FORCE) {
+            lexer.nextToken();
+            force = true;
+        }
+        return new DALDropResourceGroupStatement(name, force);
+    }
+
+    private SQLStatement dropLogfileGroup() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        Identifier engine = null;
+        name = identifier(false);
+        matchKeywords(Keywords.ENGINE);
+        if (lexer.token() == Token.OP_EQUALS) {
+            lexer.nextToken();
+        }
+        engine = identifier(false);
+        return new DDLDropLogfileGroupStatement(name, engine);
+    }
+
+    private SQLStatement dropProcedure() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        Identifier name = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        name = identifier(false);
+        return new DDLDropProcedureStatement(ifExists, name);
+    }
+
+    private SQLStatement dropFunction() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        Identifier name = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        name = identifier(false);
+        return new DDLDropFunctionStatement(ifExists, name);
+    }
+
+    private SQLStatement dropEvent() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        Identifier name = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        name = identifier(false);
+        return new DDLDropEventStatement(ifExists, name);
+    }
+
+    private SQLStatement dropDatabase() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        Identifier name = null;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        name = identifier(false);
+        return new DDLDropDatabaseStatement(ifExists, name);
+    }
+
+    private SQLStatement dropPrepare() throws SQLSyntaxErrorException {
+        Identifier name = null;
+        matchKeywords(Keywords.PREPARE);
+        name = identifier(false);
+        return new DeallocatePrepareStatement(name);
+    }
+
+    private SQLStatement dropTrigger() throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        Identifier name = identifier(false);
+        return new DDLDropTriggerStatement(ifExists, name);
+    }
+
+    private SQLStatement dropIndex() throws SQLSyntaxErrorException {
+        lexer.nextToken();
+        Identifier name = identifier(false);
+        match(Token.KW_ON);
+        Identifier table = identifier(true);
+        Integer algorithm = null;
+        Integer lockOption = null;
+        if (lexer.token() != Token.EOF) {
+            while (lexer.token() == Token.KW_LOCK || (lexer.token() == Token.IDENTIFIER
+                && lexer.parseKeyword() == Keywords.ALGORITHM)) {
+                if (lexer.token() == Token.IDENTIFIER
+                    && lexer.parseKeyword() == Keywords.ALGORITHM) {
+                    if (lexer.nextToken() == Token.OP_EQUALS) {
+                        lexer.nextToken();
+                    }
+                    switch (lexer.token()) {
+                        case Token.KW_DEFAULT:
+                            algorithm = DDLCreateIndexStatement.ALGORITHM_DEFAULT;
+                            lexer.nextToken();
+                            break;
+                        case Token.IDENTIFIER: {
+                            Identifier type = identifier();
+                            byte[] id = type.getIdText();
+                            if (BytesUtil.equalsIgnoreCase(id, "INPLACE".getBytes())) {
+                                algorithm = DDLCreateIndexStatement.ALGORITHM_INPLACE;
+                            } else if (BytesUtil.equalsIgnoreCase(id, "COPY".getBytes())) {
+                                algorithm = DDLCreateIndexStatement.ALGORITHM_COPY;
+                            }
+                            break;
+                        }
+                        default:
+                            throw new SQLSyntaxErrorException("unsupported DDL drop");
+                    }
+                } else if (lexer.token() == Token.KW_LOCK) {
+                    if (lexer.nextToken() == Token.OP_EQUALS) {
+                        lexer.nextToken();
+                    }
+                    switch (lexer.token()) {
+                        case Token.KW_DEFAULT:
+                            lockOption = DDLCreateIndexStatement.LOCK_DEFAULT;
+                            lexer.nextToken();
+                            break;
+                        case Token.IDENTIFIER: {
+                            if (lexer.parseKeyword() == Keywords.NONE) {
+                                lockOption = DDLCreateIndexStatement.LOCK_NONE;
+                                lexer.nextToken();
+                                break;
+                            }
+                            Identifier type = identifier();
+                            byte[] id = type.getIdText();
+                            if (BytesUtil.equalsIgnoreCase(id, "SHARED".getBytes())) {
+                                lockOption = DDLCreateIndexStatement.LOCK_SHARED;
+                            } else if (BytesUtil.equalsIgnoreCase(id, "EXCLUSIVE".getBytes())) {
+                                lockOption = DDLCreateIndexStatement.LOCK_EXCLUSIVE;
+                            }
+                            break;
+                        }
+                        default:
+                            throw new SQLSyntaxErrorException("unsupported DDL drop");
+                    }
+                }
+            }
+        }
+        return new DDLDropIndexStatement(name, table, algorithm, lockOption);
+    }
+
+    private SQLStatement dropTable(boolean temp) throws SQLSyntaxErrorException {
+        boolean ifExists = false;
+        if (lexer.token() == Token.KW_IF) {
+            lexer.nextToken();
+            match(Token.KW_EXISTS);
+            ifExists = true;
+        }
+        Identifier tb = identifier(true);
+        List<Identifier> list;
+        if (lexer.token() != Token.PUNC_COMMA) {
+            list = new ArrayList<Identifier>(1);
+            list.add(tb);
+        } else {
+            list = new LinkedList<Identifier>();
+            list.add(tb);
+            for (; lexer.token() == Token.PUNC_COMMA;) {
+                lexer.nextToken();
+                tb = identifier(true);
+                list.add(tb);
+            }
+        }
+        Boolean restrict = null;
+        switch (lexer.token()) {
+            case Token.KW_RESTRICT:
+                lexer.nextToken();
+                restrict = true;
+                break;
+            case Token.KW_CASCADE:
+                lexer.nextToken();
+                restrict = false;
+                break;
+        }
+        return new DDLDropTableStatement(temp, ifExists, list, restrict);
     }
 
     private SQLStatement alterView(Expression definer) throws SQLSyntaxErrorException {

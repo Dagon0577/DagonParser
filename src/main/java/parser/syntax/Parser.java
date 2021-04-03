@@ -83,6 +83,9 @@ public class Parser {
                 case Token.KW_LOAD:
                     stmt = new MySQLDMLParser(lexer, exprParser).load();
                     break;
+                case Token.KW_DROP:
+                    stmt = new MySQLDDLParser(lexer, exprParser).drop();
+                    break stmtSwitch;
                 case Token.IDENTIFIER: {
                     switch (lexer.parseKeyword()) {
                         case Keywords.END:

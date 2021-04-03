@@ -49,6 +49,7 @@ import parser.ast.stmt.dal.DALSetStatement;
 import parser.ast.stmt.dal.account.*;
 import parser.ast.stmt.dal.resource.DALAlterResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALCreateResourceGroupStatement;
+import parser.ast.stmt.dal.resource.DALDropResourceGroupStatement;
 import parser.ast.stmt.dal.resource.DALSetResourceGroupStatement;
 import parser.ast.fragment.ddl.alter.Algorithm;
 import parser.ast.stmt.ddl.alter.DDLAlterDatabaseStatement;
@@ -74,10 +75,23 @@ import parser.ast.stmt.ddl.create.DDLCreateTableStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTablespaceStatement;
 import parser.ast.stmt.ddl.create.DDLCreateTriggerStatement;
 import parser.ast.stmt.ddl.create.DDLCreateViewStatement;
+import parser.ast.stmt.ddl.drop.DDLDropDatabaseStatement;
+import parser.ast.stmt.ddl.drop.DDLDropEventStatement;
+import parser.ast.stmt.ddl.drop.DDLDropFunctionStatement;
+import parser.ast.stmt.ddl.drop.DDLDropIndexStatement;
+import parser.ast.stmt.ddl.drop.DDLDropLogfileGroupStatement;
+import parser.ast.stmt.ddl.drop.DDLDropProcedureStatement;
+import parser.ast.stmt.ddl.drop.DDLDropServerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropSpatialReferenceSystemStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTableStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTablespaceStatement;
+import parser.ast.stmt.ddl.drop.DDLDropTriggerStatement;
+import parser.ast.stmt.ddl.drop.DDLDropViewStatement;
 import parser.ast.stmt.dml.*;
 import parser.ast.stmt.dml.DMLSelectStatement.SelectOption;
 import parser.ast.stmt.dml.DMLSelectStatement.OutFile;
 import parser.ast.stmt.dml.DMLSelectStatement.LockMode;
+import parser.ast.stmt.prepare.DeallocatePrepareStatement;
 import parser.ast.stmt.transactional.BeginStatement;
 import parser.ast.stmt.transactional.SetTransactionStatement;
 
@@ -391,4 +405,36 @@ public interface Visitor {
     public void visit(DALLoadIndexIntoCacheStatement node);
 
     public void visit(TableIndexList node);
+
+    public void visit(DDLDropDatabaseStatement node);
+
+    public void visit(DDLDropEventStatement node);
+
+    public void visit(DDLDropFunctionStatement node);
+
+    public void visit(DDLDropIndexStatement node);
+
+    public void visit(DDLDropLogfileGroupStatement node);
+
+    public void visit(DDLDropProcedureStatement node);
+
+    public void visit(DDLDropServerStatement node);
+
+    public void visit(DDLDropSpatialReferenceSystemStatement node);
+
+    public void visit(DDLDropTablespaceStatement node);
+
+    public void visit(DDLDropTableStatement node);
+
+    public void visit(DDLDropTriggerStatement node);
+
+    public void visit(DDLDropViewStatement node);
+
+    public void visit(DALDropRoleStatement node);
+
+    public void visit(DALDropUserStatement node);
+
+    public void visit(DALDropResourceGroupStatement node);
+
+    public void visit(DeallocatePrepareStatement node);
 }
